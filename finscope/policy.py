@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import IntEnum
+import hashlib
+import re
 from collections.abc import Mapping, Sequence
 from typing import Any, Optional, Tuple, Union
 
@@ -35,6 +37,100 @@ class PrivacyLevel(IntEnum):
 class PrivacyDecision:
     level: PrivacyLevel
     reasons: Tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class ResidualScanDecision:
+    should_scan: bool
+    reason: str
+    fingerprint: str
+
+
+class ResidualScanPolicy:
+    """Gate local-model calls after residual detection has stabilized.
+
+    ``balanced`` enters cooldown after consecutive empty scans, while still
+    waking on risk signals, privacy escalation, and periodic probes.
+    ``conservative`` additionally scans every previously unseen template.
+    """
+
+    _ALIAS_PATTERN = re.compile(
+        r"FS_(?:ASSET|ORG|PORTFOLIO|STRATEGY|ACCOUNT|REF|ACTION|REL|INTENT)_"
+        r"[A-Z2-9]{8}",
+        re.IGNORECASE,
+    )
+    _RISK_PATTERNS = (
+        re.compile(r"(?<![A-Za-z0-9_])[A-Z]{2,6}(?![A-Za-z0-9_])"),
+        re.compile(r"(?<!\d)\d{6}(?!\d)"),
+        re.compile(
+            r"account|portfolio|holding|position|watchlist|order|trade|"
+            r"账户|组合|策略|持仓|候选池|买入|卖出|增持|减持|清仓|调仓",
+            re.IGNORECASE,
+        ),
+    )
+
+    def __init__(
+        self,
+        *,
+        warmup_scans: int = 2,
+        no_new_threshold: int = 3,
+        probe_interval: int = 10,
+        max_safe_templates: int = 2048,
+        mode: str = "balanced",
+    ) -> None:
+        if warmup_scans < 0:
+            raise ValueError("warmup_scans cannot be negative")
+        if no_new_threshold < 1 or probe_interval < 1 or max_safe_templates < 1:
+            raise ValueError("scan thresholds must be positive")
+        if mode not in {"balanced", "conservative"}:
+            raise ValueError("mode must be 'balanced' or 'conservative'")
+        self.warmup_scans = warmup_scans
+        self.no_new_threshold = no_new_threshold
+        self.probe_interval = probe_interval
+        self.max_safe_templates = max_safe_templates
+        self.mode = mode
+
+    def decide(
+        self,
+        text: str,
+        *,
+        model_calls: int,
+        consecutive_empty_scans: int,
+        skipped_since_probe: int,
+        safe_fingerprints: Sequence[str],
+        privacy_level: PrivacyLevel,
+        last_scan_level: PrivacyLevel,
+        force: bool = False,
+    ) -> ResidualScanDecision:
+        fingerprint = self.fingerprint(text)
+        if force:
+            return ResidualScanDecision(True, "forced", fingerprint)
+        residual = self._ALIAS_PATTERN.sub(" ", text).strip()
+        if not residual:
+            return ResidualScanDecision(False, "aliases-only", fingerprint)
+        if privacy_level > last_scan_level:
+            return ResidualScanDecision(True, "privacy-escalation", fingerprint)
+        if any(pattern.search(residual) for pattern in self._RISK_PATTERNS):
+            return ResidualScanDecision(True, "risk-signal", fingerprint)
+        if model_calls < self.warmup_scans:
+            return ResidualScanDecision(True, "warmup", fingerprint)
+        if consecutive_empty_scans < self.no_new_threshold:
+            return ResidualScanDecision(True, "stabilizing", fingerprint)
+        if skipped_since_probe >= self.probe_interval:
+            return ResidualScanDecision(True, "periodic-probe", fingerprint)
+        if fingerprint in safe_fingerprints:
+            return ResidualScanDecision(False, "safe-template", fingerprint)
+        if self.mode == "conservative":
+            return ResidualScanDecision(True, "unseen-template", fingerprint)
+        return ResidualScanDecision(False, "cooldown", fingerprint)
+
+    @classmethod
+    def fingerprint(cls, text: str) -> str:
+        normalized = cls._ALIAS_PATTERN.sub("<alias>", text)
+        normalized = re.sub(r"https?://\S+", "<url>", normalized)
+        normalized = re.sub(r"\d+(?:\.\d+)?", "<num>", normalized)
+        normalized = " ".join(normalized.casefold().split())
+        return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
 
 
 class AdaptivePrivacyPolicy:

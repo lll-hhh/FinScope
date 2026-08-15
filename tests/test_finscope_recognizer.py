@@ -4,10 +4,65 @@ import json
 import re
 import unittest
 
-from finscope import FinScopeMediator, JsonModelEntityRecognizer, PrivacyLevel
+from finscope import (
+    FinScopeMediator,
+    JsonModelEntityRecognizer,
+    PrivacyLevel,
+    ResidualScanPolicy,
+)
 
 
 class FinScopeRecognizerTests(unittest.TestCase):
+    def test_residual_scan_gate_cools_down_and_periodically_probes(self) -> None:
+        calls = []
+
+        def fake_model(_prompt: str) -> str:
+            calls.append(True)
+            return json.dumps({"entities": []})
+
+        mediator = FinScopeMediator(
+            entity_recognizer=JsonModelEntityRecognizer(fake_model),
+            residual_scan_policy=ResidualScanPolicy(
+                warmup_scans=1,
+                no_new_threshold=1,
+                probe_interval=2,
+            ),
+        )
+        scope = mediator.open_scope("scan-gate-task", "2026-08-15")
+
+        mediator.sanitize_prompt("稳定的研究模板", scope)
+        mediator.sanitize_prompt("稳定的研究模板", scope)
+        mediator.sanitize_prompt("稳定的研究模板", scope)
+        mediator.sanitize_prompt("稳定的研究模板", scope)
+
+        self.assertEqual(len(calls), 2)
+        metrics = mediator.get_metrics(scope)
+        self.assertGreaterEqual(metrics["recognizer_skips"], 2)
+        self.assertEqual(metrics["recognizer_probes"], 1)
+
+    def test_scan_gate_wakes_on_risk_signal_and_force_flag(self) -> None:
+        calls = []
+
+        def fake_model(_prompt: str) -> str:
+            calls.append(True)
+            return json.dumps({"entities": []})
+
+        mediator = FinScopeMediator(
+            entity_recognizer=JsonModelEntityRecognizer(fake_model),
+            residual_scan_policy=ResidualScanPolicy(
+                warmup_scans=1,
+                no_new_threshold=1,
+                probe_interval=20,
+            ),
+        )
+        scope = mediator.open_scope("scan-wake-task", "2026-08-15")
+
+        mediator.sanitize_prompt("稳定模板", scope)
+        mediator.sanitize_prompt("稳定模板", scope)
+        mediator.sanitize_prompt("新代码 XYZ", scope)
+        mediator.sanitize_prompt("仍然稳定", scope, force_model_scan=True)
+
+        self.assertEqual(len(calls), 3)
     def test_known_list_is_replaced_before_residual_model_call_and_coreference_reuses_it(self) -> None:
         observed = {}
 

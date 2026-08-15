@@ -20,7 +20,13 @@ from .recognizer import (
     JsonModelEntityRecognizer,
     TransformersEntityRecognizer,
 )
-from .policy import AdaptivePrivacyPolicy, PrivacyDecision, PrivacyLevel
+from .policy import (
+    AdaptivePrivacyPolicy,
+    PrivacyDecision,
+    PrivacyLevel,
+    ResidualScanDecision,
+    ResidualScanPolicy,
+)
 
 __all__ = [
     "ActionValidationError",
@@ -37,4 +43,6 @@ __all__ = [
     "AdaptivePrivacyPolicy",
     "PrivacyDecision",
     "PrivacyLevel",
+    "ResidualScanDecision",
+    "ResidualScanPolicy",
 ]

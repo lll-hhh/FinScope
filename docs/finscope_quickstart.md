@@ -11,6 +11,35 @@
 3. FinScope 校验片段确实存在于模型输入中，过滤模型输出的 `FS_*` 假实体，并在本地为新语义分配代号；
 4. 按 span 从后往前替换，之后对没有歧义的同义词再做一次补漏替换。
 
+### 小模型调用门控
+
+小模型不是每条消息都调用。`ResidualScanPolicy` 默认先预热两次，连续三次没有新替换后进入 cooldown；命中已确认安全的模板直接跳过，连续跳过十次做一次真实周期抽检。抽检会清除识别器缓存，保证重新喂给模型。未识别的 Ticker/六位证券代码、账户/持仓/调仓词、保密等级上升和显式 `force_model_scan=True` 都会立即唤醒模型。默认是 `balanced`，高风险实验可以配置 `mode="conservative"`，对每个新模板都扫描。
+
+```python
+from finscope import ResidualScanPolicy
+
+mediator = FinScopeMediator(
+    asset_catalog,
+    entity_recognizer=local_recognizer,
+    residual_scan_policy=ResidualScanPolicy(
+        warmup_scans=2,
+        no_new_threshold=3,
+        probe_interval=10,
+        mode="balanced",
+    ),
+)
+
+# Feed a newly refreshed news/tool source through a fresh local scan.
+safe = mediator.sanitize_tool_result(
+    news_result,
+    scope,
+    force_model_scan=True,
+)
+print(mediator.get_privacy_status(scope))
+```
+
+`get_metrics(scope)` 会记录 `recognizer_calls`、`recognizer_skips`、`recognizer_probes`、`recognizer_empty_scans` 和 `recognizer_new_replacements`，可以直接换算本地模型调用节省比例。
+
 模型不能创建代号或修改映射表。`reference` 如果指向已有 alias，会直接复用目标 alias；因此“该股”“它”等指代不会平白产生第二个代号。相同表面词如果同时代表资产和机构，FinScope 保留多个 typed mapping，只有模型给出具体 span/type 时才替换，避免全局字符串替换误伤。
 
 ```python

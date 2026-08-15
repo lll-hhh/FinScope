@@ -39,6 +39,9 @@ class EntityRecognizer:
     ) -> Sequence[EntitySpan]:
         raise NotImplementedError
 
+    def clear_cache(self) -> None:
+        """Optional hook used by periodic probes to force a fresh inference."""
+
 
 class CatalogEntityRecognizer(EntityRecognizer):
     """Deterministic fallback for a local security master."""
@@ -138,6 +141,10 @@ class JsonModelEntityRecognizer(EntityRecognizer):
                 self._cache.pop(next(iter(self._cache)))
             self._cache[cache_key] = tuple(spans)
         return spans
+
+    def clear_cache(self) -> None:
+        with self._lock:
+            self._cache.clear()
 
     def _build_prompt(self, text: str, candidates: Sequence[str]) -> str:
         candidate_block = "\n".join(f"- {candidate}" for candidate in candidates)

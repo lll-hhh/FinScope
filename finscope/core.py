@@ -17,7 +17,12 @@ import threading
 from collections.abc import Callable, Mapping, MutableMapping, Sequence
 from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 
-from .policy import AdaptivePrivacyPolicy, PrivacyLevel
+from .policy import (
+    AdaptivePrivacyPolicy,
+    PrivacyLevel,
+    ResidualScanDecision,
+    ResidualScanPolicy,
+)
 from .recognizer import EntityRecognizer, EntitySpan
 
 
@@ -74,6 +79,10 @@ class _ScopeState:
     display_names: Dict[str, str] = field(default_factory=dict)
     surface_aliases: Dict[str, set] = field(default_factory=dict)
     escalation_reasons: List[str] = field(default_factory=list)
+    safe_residual_fingerprints: List[str] = field(default_factory=list)
+    consecutive_empty_scans: int = 0
+    skipped_since_probe: int = 0
+    last_scan_privacy_level: PrivacyLevel = PrivacyLevel.STANDARD
     metrics: Dict[str, int] = field(
         default_factory=lambda: {
             "assets_registered": 0,
@@ -89,6 +98,10 @@ class _ScopeState:
             "entities_detected": 0,
             "privacy_escalations": 0,
             "effective_privacy_level": int(PrivacyLevel.STANDARD),
+            "recognizer_skips": 0,
+            "recognizer_probes": 0,
+            "recognizer_new_replacements": 0,
+            "recognizer_empty_scans": 0,
         }
     )
 
@@ -178,6 +191,7 @@ class FinScopeMediator:
         strict_actions: bool = True,
         entity_recognizer: Optional[EntityRecognizer] = None,
         privacy_policy: Optional[AdaptivePrivacyPolicy] = None,
+        residual_scan_policy: Optional[ResidualScanPolicy] = None,
     ) -> None:
         self._lock = threading.RLock()
         self._scopes: Dict[str, _ScopeState] = {}
@@ -186,6 +200,7 @@ class FinScopeMediator:
         self.strict_actions = strict_actions
         self.entity_recognizer = entity_recognizer
         self.privacy_policy = privacy_policy or AdaptivePrivacyPolicy()
+        self.residual_scan_policy = residual_scan_policy or ResidualScanPolicy()
         self._catalog_lookup: Dict[str, Tuple[str, Tuple[str, ...]]] = {}
         self._catalog_entities: List[str] = []
         catalog_owners: Dict[str, str] = {}
@@ -233,6 +248,7 @@ class FinScopeMediator:
         max_new_tokens: int = 256,
         strict_actions: bool = True,
         privacy_policy: Optional[AdaptivePrivacyPolicy] = None,
+        residual_scan_policy: Optional[ResidualScanPolicy] = None,
     ) -> "FinScopeMediator":
         """Create a mediator whose sensitive-entity decisions use a local LM."""
 
@@ -264,6 +280,7 @@ class FinScopeMediator:
             strict_actions=strict_actions,
             entity_recognizer=recognizer,
             privacy_policy=privacy_policy,
+            residual_scan_policy=residual_scan_policy,
         )
 
     # ------------------------------------------------------------------
@@ -383,6 +400,7 @@ class FinScopeMediator:
         state.display_names.clear()
         state.surface_aliases.clear()
         state.escalation_reasons.clear()
+        state.safe_residual_fingerprints.clear()
 
     def _state(self, scope: Union[Scope, str]) -> _ScopeState:
         scope_id = scope.id if isinstance(scope, Scope) else scope
@@ -534,16 +552,43 @@ class FinScopeMediator:
         text: str,
         state: _ScopeState,
         privacy_level: PrivacyLevel,
+        *,
+        force_model_scan: bool = False,
     ) -> str:
         if self.entity_recognizer is None or not text.strip():
             return text
+        scan_decision = self.residual_scan_policy.decide(
+            text,
+            model_calls=state.metrics["recognizer_calls"],
+            consecutive_empty_scans=state.consecutive_empty_scans,
+            skipped_since_probe=state.skipped_since_probe,
+            safe_fingerprints=state.safe_residual_fingerprints,
+            privacy_level=privacy_level,
+            last_scan_level=state.last_scan_privacy_level,
+            force=force_model_scan,
+        )
+        if not scan_decision.should_scan:
+            state.metrics["recognizer_skips"] += 1
+            state.skipped_since_probe += 1
+            return text
+        if scan_decision.reason == "periodic-probe":
+            state.metrics["recognizer_probes"] += 1
+        if scan_decision.reason in {
+            "periodic-probe",
+            "forced",
+            "privacy-escalation",
+        }:
+            self.entity_recognizer.clear_cache()
         state.metrics["recognizer_calls"] += 1
+        state.skipped_since_probe = 0
+        state.last_scan_privacy_level = privacy_level
         try:
             # The security-master pass already ran, so the model sees only
             # residual text and existing aliases, never the raw known list.
             entities = self.entity_recognizer.recognize(text, ())
         except Exception:
             state.metrics["recognizer_errors"] += 1
+            state.consecutive_empty_scans = 0
             return text
         accepted_entities: List[EntitySpan] = []
         for entity in entities:
@@ -659,6 +704,20 @@ class FinScopeMediator:
         sanitized = text
         for start, end, alias in sorted(replacements, reverse=True):
             sanitized = sanitized[:start] + alias + sanitized[end:]
+        if replacements:
+            state.consecutive_empty_scans = 0
+            state.metrics["recognizer_new_replacements"] += len(replacements)
+        else:
+            state.consecutive_empty_scans += 1
+            state.metrics["recognizer_empty_scans"] += 1
+            fingerprint = self.residual_scan_policy.fingerprint(text)
+            if fingerprint not in state.safe_residual_fingerprints:
+                state.safe_residual_fingerprints.append(fingerprint)
+                if (
+                    len(state.safe_residual_fingerprints)
+                    > self.residual_scan_policy.max_safe_templates
+                ):
+                    state.safe_residual_fingerprints.pop(0)
         # If the model returned only one occurrence, finish replacing any
         # surface that has exactly one meaning in the current scope.
         return self._replace_assets(sanitized, state)
@@ -669,9 +728,15 @@ class FinScopeMediator:
         state: _ScopeState,
         privacy_level: PrivacyLevel,
         key_hint: str = "",
+        force_model_scan: bool = False,
     ) -> JsonValue:
         if isinstance(value, str):
-            return self._model_sanitize_string(value, state, privacy_level)
+            return self._model_sanitize_string(
+                value,
+                state,
+                privacy_level,
+                force_model_scan=force_model_scan,
+            )
         if isinstance(value, Mapping):
             return {
                 key: self._sanitize_residual_value(
@@ -679,6 +744,7 @@ class FinScopeMediator:
                     state,
                     privacy_level,
                     str(key).casefold(),
+                    force_model_scan,
                 )
                 for key, item in value.items()
             }
@@ -686,7 +752,13 @@ class FinScopeMediator:
             value, (str, bytes, bytearray)
         ):
             return [
-                self._sanitize_residual_value(item, state, privacy_level, key_hint)
+                self._sanitize_residual_value(
+                    item,
+                    state,
+                    privacy_level,
+                    key_hint,
+                    force_model_scan,
+                )
                 for item in value
             ]
         return value
@@ -751,6 +823,7 @@ class FinScopeMediator:
         scope: Union[Scope, str],
         *,
         privacy_level: Optional[Union[PrivacyLevel, str, int]] = None,
+        force_model_scan: bool = False,
     ) -> JsonValue:
         """Run deterministic first-pass and model-assisted residual sanitization."""
 
@@ -781,6 +854,7 @@ class FinScopeMediator:
                 first_pass,
                 state,
                 decision.level,
+                force_model_scan=force_model_scan,
             )
             state.metrics["payloads_sanitized"] += 1
             return sanitized
@@ -791,8 +865,14 @@ class FinScopeMediator:
         scope: Union[Scope, str],
         *,
         privacy_level: Optional[Union[PrivacyLevel, str, int]] = None,
+        force_model_scan: bool = False,
     ) -> str:
-        result = self.sanitize(prompt, scope, privacy_level=privacy_level)
+        result = self.sanitize(
+            prompt,
+            scope,
+            privacy_level=privacy_level,
+            force_model_scan=force_model_scan,
+        )
         if not isinstance(result, str):
             raise TypeError("sanitize_prompt expects a string")
         return result
@@ -803,8 +883,14 @@ class FinScopeMediator:
         scope: Union[Scope, str],
         *,
         privacy_level: Optional[Union[PrivacyLevel, str, int]] = None,
+        force_model_scan: bool = False,
     ) -> JsonValue:
-        return self.sanitize(result, scope, privacy_level=privacy_level)
+        return self.sanitize(
+            result,
+            scope,
+            privacy_level=privacy_level,
+            force_model_scan=force_model_scan,
+        )
 
     def sanitize_messages(
         self,
@@ -812,11 +898,13 @@ class FinScopeMediator:
         scope: Union[Scope, str],
         *,
         privacy_level: Optional[Union[PrivacyLevel, str, int]] = None,
+        force_model_scan: bool = False,
     ) -> List[Dict[str, Any]]:
         result = self.sanitize(
             list(messages),
             scope,
             privacy_level=privacy_level,
+            force_model_scan=force_model_scan,
         )
         if not isinstance(result, list):
             raise TypeError("messages must sanitize to a list")
@@ -937,10 +1025,16 @@ class FinScopeMediator:
         scope: Union[Scope, str],
         *,
         privacy_level: Optional[Union[PrivacyLevel, str, int]] = None,
+        force_model_scan: bool = False,
     ) -> JsonValue:
         """Run an external call with sanitized input and locally restored output."""
 
-        sanitized = self.sanitize(payload, scope, privacy_level=privacy_level)
+        sanitized = self.sanitize(
+            payload,
+            scope,
+            privacy_level=privacy_level,
+            force_model_scan=force_model_scan,
+        )
         response = llm_call(sanitized)
         return self.restore_output(response, scope)
 
@@ -1116,6 +1210,10 @@ class FinScopeMediator:
                 "reasons": tuple(state.escalation_reasons),
                 "conversation_id": state.scope.conversation_id,
                 "trading_day": state.scope.trading_day,
+                "scan_mode": self.residual_scan_policy.mode,
+                "consecutive_empty_scans": state.consecutive_empty_scans,
+                "skipped_since_probe": state.skipped_since_probe,
+                "safe_template_count": len(state.safe_residual_fingerprints),
             }
 
     def get_mapping_records(self, scope: Union[Scope, str]) -> List[Dict[str, Any]]:
