@@ -37,6 +37,14 @@ For long-running agents, inspect `mediator.get_privacy_status(scope)` for scan s
 
 For local model inference, see `docs/finscope_quickstart.md` and `examples/finscope_local_model_demo.py`. The Transformers integration is lazy; the base package itself has no third-party runtime dependency.
 
+## Project handoff and experiment background
+
+- [`docs/project_background.md`](docs/project_background.md): B1 problem definition, threat model, current implementation, Qwen model roles, NLPCC data integration, metrics, baselines, limitations, and execution roadmap.
+- [`docs/agent_handoff_prompt.md`](docs/agent_handoff_prompt.md): copy-paste startup prompt for an agent on another server.
+- [`docs/finscope_quickstart.md`](docs/finscope_quickstart.md): API and local recognizer quick start.
+
+The current repository contains the privacy mediation prototype and tests. It does not yet contain a completed TradingAgents/FinRobot adapter or reported financial backtest results. Those are the next integration tasks described in the handoff document.
+
 ## Tests
 
 ```bash
