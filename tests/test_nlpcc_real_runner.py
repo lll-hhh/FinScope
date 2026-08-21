@@ -18,6 +18,7 @@ from benchmarks.run_nlpcc_real import (
 )
 from benchmarks.merge_nlpcc_runs import compute_expanded_metrics
 from benchmarks.run_nlpcc_fault_injection import perturbations
+from benchmarks.bootstrap_nlpcc_finance import evaluate as bootstrap_finance
 from benchmarks.run_nlpcc_privacy_attacks import (
     candidate_signature,
     moving_block_interval,
@@ -282,6 +283,21 @@ class RealNlpccRunnerTests(unittest.TestCase):
                 "numeric_out_of_range",
                 "execution_cash_violation",
             }.issubset(variants)
+        )
+
+    def test_paired_finance_bootstrap_uses_shared_blocks(self) -> None:
+        histories = {
+            "vanilla": [100.0, 101.0, 102.0, 103.0],
+            "finscope": [100.0, 101.0, 102.0, 103.0],
+        }
+        result = bootstrap_finance(histories, replicates=100, block_size=2, seed=7)
+        self.assertEqual(
+            result["metrics"]["finscope"]["total_return_delta_vs_vanilla_95ci"],
+            [0.0, 0.0],
+        )
+        self.assertEqual(
+            result["metrics"]["finscope"]["sharpe_delta_vs_vanilla_95ci"],
+            [0.0, 0.0],
         )
 
 
