@@ -9,7 +9,11 @@ from pathlib import Path
 from typing import Any
 
 
-CONDITIONS = (("original", "original_valid"), ("direct", "direct_valid"), ("finscope", "finscope"))
+CONDITIONS = (
+    ("plaintext_original", "plaintext_original"),
+    ("global_direct_alias", "global_direct_alias"),
+    ("scoped_finscope_alias", "scoped_finscope_alias"),
+)
 
 
 def _format(value: Any, key: str) -> str:
@@ -41,6 +45,8 @@ def main() -> None:
         rows.append(summary)
 
     comparison = {
+        "experiment_id": "multiagent-proxy-top2-qwen3-8b-2025",
+        "experiment_kind": "official starter multi-agent proxy integration study",
         "benchmark": "NLPCC2026 Shared Task 4",
         "track": "macro",
         "period": "2025-01-02 to 2025-12-31",
@@ -71,8 +77,10 @@ def main() -> None:
         ("Mean latency s", "mean_latency_s"),
     )
     lines = [
-        "# FinScope × NLPCC2026 Task 4 — Main Experiment",
+        "# NLPCC2026 Task 4 — Official-Starter Multi-Agent Proxy Study",
         "",
+        "- Experiment ID: multiagent-proxy-top2-qwen3-8b-2025",
+        "- Distinct from: benchmarks/run_nlpcc_real.py and its Qwen3.8-27B Top-20 report",
         "- Track: macro",
         "- Period: 2025-01-02 to 2025-12-31 (243 trading days)",
         "- News setting: top-rank=2 (research main experiment; not an official Top-20 leaderboard score)",

@@ -1,5 +1,5 @@
 {
-  "condition": "original_valid",
+  "condition": "plaintext_original",
   "result_file": "runs/nlpcc2026/main2025_top2/original_valid/result.json",
   "audit_file": "runs/nlpcc2026/main2025_top2/original_valid/proxy.jsonl",
   "total_return": 0.23774822216962638,
@@ -17,11 +17,14 @@
   },
   "mean_latency_s": 2.3014549757257434,
   "median_latency_s": 1.2381315156817436,
+  "p95_latency_s": 2.4641986355185437,
   "total_prompt_tokens": 9547533,
   "total_completion_tokens": 735229,
   "total_alias_occurrences": 0,
   "input_sensitive_occurrences": 24415,
   "outbound_sensitive_occurrences": 24415,
+  "input_sensitive_record_count": 1998,
+  "outbound_sensitive_record_count": 1998,
   "external_identifier_exposure_rate": 1.0,
   "decision_days": 243,
   "days_with_submitted_trades": 239,
@@ -29,9 +32,21 @@
   "max_drawdown_computed": -0.06423924175351492,
   "daily_return_mean": 0.0009104935972241735,
   "daily_return_std": 0.007581879473569246,
+  "annualized_volatility_computed": 0.12035860534517726,
+  "calmar_ratio_computed": 3.8187596456382926,
+  "positive_day_rate": 0.5578512396694215,
+  "var_95_loss": 0.01000259915443496,
+  "cvar_95_loss": 0.017992630583943976,
+  "best_day_return": 0.02635649278339769,
+  "worst_day_return": -0.040758591506475206,
+  "max_drawdown_duration_days": 76,
   "trade_attempt_count": 749,
   "executed_trade_count": 627,
   "rejected_trade_count": 122,
   "execution_success_rate": 0.8371161548731643,
-  "commission_total": 220.1390084424478
+  "commission_total": 220.1390084424478,
+  "rejection_reason_counts": {
+    "Insufficient capital": 60,
+    "No holdings to sell": 62
+  }
 }

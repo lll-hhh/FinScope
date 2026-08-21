@@ -9,7 +9,7 @@ from collections import Counter
 from math import sqrt
 from pathlib import Path
 from statistics import mean, median, stdev
-from typing import Any, Iterable
+from typing import Any, Iterable, Optional
 
 
 def _read_json(path: Path) -> Any:
@@ -35,6 +35,17 @@ def _pick(mapping: dict[str, Any], names: Iterable[str]) -> Any:
     return None
 
 
+def _quantile(values: list[float], probability: float) -> Optional[float]:
+    if not values:
+        return None
+    ordered = sorted(values)
+    position = (len(ordered) - 1) * probability
+    lower = int(position)
+    upper = min(lower + 1, len(ordered) - 1)
+    fraction = position - lower
+    return ordered[lower] * (1 - fraction) + ordered[upper] * fraction
+
+
 def _financial_metrics(result: dict[str, Any]) -> dict[str, Any]:
     # The official engine's portfolio_value_history is the source used for its
     # own final return.  It may contain duplicate entries for a date, so retain
@@ -51,11 +62,18 @@ def _financial_metrics(result: dict[str, Any]) -> dict[str, Any]:
     if len(returns) > 1 and stdev(returns) > 0:
         sharpe = sqrt(252) * mean(returns) / stdev(returns)
     max_drawdown = None
+    max_drawdown_duration = 0
     if values:
         peak = values[0]
         drawdowns = []
+        current_duration = 0
         for value in values:
-            peak = max(peak, value)
+            if value >= peak:
+                peak = value
+                current_duration = 0
+            else:
+                current_duration += 1
+                max_drawdown_duration = max(max_drawdown_duration, current_duration)
             drawdowns.append(value / peak - 1)
         max_drawdown = min(drawdowns)
 
@@ -65,6 +83,18 @@ def _financial_metrics(result: dict[str, Any]) -> dict[str, Any]:
         for trade in decision.get("trade_results", [])
     ]
     executed = sum(bool(trade.get("success")) for trade in trade_results)
+    rejection_reasons = Counter()
+    for trade in trade_results:
+        if trade.get("success"):
+            continue
+        reason = str(trade.get("reason") or "unknown")
+        if reason.startswith("Insufficient capital"):
+            reason = "Insufficient capital"
+        rejection_reasons[reason] += 1
+    annualized_return = _pick(result.get("performance", result), ["annualized_return", "annual_return"])
+    annualized_volatility = stdev(returns) * sqrt(252) if len(returns) > 1 else None
+    var_threshold = _quantile(returns, 0.05)
+    cvar_tail = [value for value in returns if var_threshold is not None and value <= var_threshold]
     return {
         "decision_days": len(end_of_day),
         "days_with_submitted_trades": len(result.get("agent_decisions", [])),
@@ -72,11 +102,24 @@ def _financial_metrics(result: dict[str, Any]) -> dict[str, Any]:
         "max_drawdown_computed": max_drawdown,
         "daily_return_mean": mean(returns) if returns else None,
         "daily_return_std": stdev(returns) if len(returns) > 1 else None,
+        "annualized_volatility_computed": annualized_volatility,
+        "calmar_ratio_computed": (
+            float(annualized_return) / abs(max_drawdown)
+            if annualized_return is not None and max_drawdown not in (None, 0)
+            else None
+        ),
+        "positive_day_rate": sum(value > 0 for value in returns) / len(returns) if returns else None,
+        "var_95_loss": max(0.0, -var_threshold) if var_threshold is not None else None,
+        "cvar_95_loss": -mean(cvar_tail) if cvar_tail else None,
+        "best_day_return": max(returns) if returns else None,
+        "worst_day_return": min(returns) if returns else None,
+        "max_drawdown_duration_days": max_drawdown_duration,
         "trade_attempt_count": len(trade_results),
         "executed_trade_count": executed,
         "rejected_trade_count": len(trade_results) - executed,
         "execution_success_rate": executed / len(trade_results) if trade_results else None,
         "commission_total": sum(float(trade.get("commission", 0) or 0) for trade in trade_results),
+        "rejection_reason_counts": dict(sorted(rejection_reasons.items())),
     }
 
 
@@ -106,11 +149,18 @@ def summarize(result_path: Path, audit_path: Path) -> dict[str, Any]:
         "role_request_counts": dict(sorted(roles.items())),
         "mean_latency_s": mean(latencies) if latencies else None,
         "median_latency_s": median(latencies) if latencies else None,
+        "p95_latency_s": _quantile(latencies, 0.95),
         "total_prompt_tokens": sum(int(item.get("prompt_tokens", 0)) for item in usage),
         "total_completion_tokens": sum(int(item.get("completion_tokens", 0)) for item in usage),
         "total_alias_occurrences": sum(int(row.get("alias_occurrences", 0)) for row in ok),
         "input_sensitive_occurrences": input_sensitive,
         "outbound_sensitive_occurrences": outbound_sensitive,
+        "input_sensitive_record_count": sum(
+            int(row.get("input_sensitive_occurrences", 0)) > 0 for row in audit
+        ),
+        "outbound_sensitive_record_count": sum(
+            int(row.get("outbound_sensitive_occurrences", 0)) > 0 for row in audit
+        ),
         "external_identifier_exposure_rate": (
             outbound_sensitive / input_sensitive if input_sensitive else None
         ),

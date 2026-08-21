@@ -1,7 +1,9 @@
-# NLPCC 2026 Task 4 experiment adapter
+# NLPCC2026 Task 4 official-starter multi-agent proxy adapter (Top-2)
 
 This directory evaluates the official multi-agent starter pipeline under three
 controlled privacy conditions while leaving the official benchmark code intact.
+It is the adapter for experiment `multiagent-proxy-top2-qwen3-8b-2025`, not the
+single-action Qwen3.8-27B experiment implemented by `benchmarks/run_nlpcc_real.py`.
 
 - `original`: official prompts, unchanged.
 - `direct`: globally stable deterministic aliases.
@@ -24,7 +26,7 @@ the full news corpus.
 Example proxy command from the repository root:
 
 ```bash
-python NLPCC2026_Main_Experiment/code/privacy_proxy.py \
+python NLPCC2026_Task4_MultiAgent_Proxy_Top2/code/privacy_proxy.py \
   --mode finscope \
   --port 8012 \
   --nlpcc-root /private/phx/NLPCC2026-Shared-Task-4/NLPCC_tasks \
