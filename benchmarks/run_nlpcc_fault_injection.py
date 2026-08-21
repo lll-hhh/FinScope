@@ -67,7 +67,7 @@ def canonical_action(record: Mapping[str, Any]) -> Optional[Dict[str, Any]]:
 def synthetic_portfolio(action: Mapping[str, Any]) -> Portfolio:
     portfolio = Portfolio()
     portfolio.holdings = {asset: 10_000.0 for asset in FUND_POOL}
-    portfolio.cash = 100_000.0
+    portfolio.cash = max(100_000.0, float(action.get("amount", 0.0)) * 1.1)
     return portfolio
 
 
