@@ -11,10 +11,12 @@ import argparse
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 import hashlib
+import hmac
 import json
 import math
 from pathlib import Path
 import re
+import secrets
 import shutil
 import statistics
 import subprocess
@@ -64,6 +66,19 @@ FUND_PROFILES = {
     "000012.SH": ("国债指数", "固定收益"),
     "518880.SH": ("黄金ETF", "贵金属"),
 }
+DISCLOSURE_GROUPS = {
+    "000300.SH": ("宽基权益组", "权益风险资产"),
+    "000905.SH": ("宽基权益组", "权益风险资产"),
+    "399006.SZ": ("成长权益组", "权益风险资产"),
+    "000688.SH": ("成长权益组", "权益风险资产"),
+    "000932.SH": ("消费传媒组", "权益风险资产"),
+    "399971.SZ": ("消费传媒组", "权益风险资产"),
+    "000941.SH": ("周期资源组", "权益风险资产"),
+    "000819.SH": ("周期资源组", "权益风险资产"),
+    "000928.SH": ("周期资源组", "权益风险资产"),
+    "000012.SH": ("防御分散组", "防御分散资产"),
+    "518880.SH": ("防御分散组", "防御分散资产"),
+}
 CANONICAL_ASSET = {
     identifier.casefold(): asset
     for asset, profile in FUND_PROFILES.items()
@@ -105,6 +120,7 @@ def source_provenance() -> Tuple[str, bool]:
 
 
 FINSCOPE_COMMIT, FINSCOPE_SOURCE_DIRTY = source_provenance()
+_EPISODE_ALIAS_KEY = secrets.token_bytes(32)
 
 
 @dataclass
@@ -221,10 +237,13 @@ def asset_catalog() -> List[Dict[str, Any]]:
             "canonical_id": asset,
             "name": FUND_PROFILES[asset][0],
             "aliases": [asset, asset.split(".", 1)[0]],
-            "asset_type": "ETF" if asset == "518880.SH" else "指数",
-            "market": "中国市场",
-            "sector_l1": FUND_PROFILES[asset][1],
-            "version": "nlpcc-track1-2026",
+            "asset_type": "金融资产",
+            "market": "中国公开市场",
+            "sector_l1": DISCLOSURE_GROUPS[asset][1],
+            "sector_l2": DISCLOSURE_GROUPS[asset][0],
+            "sector_l3": DISCLOSURE_GROUPS[asset][0],
+            "size_bucket": "标准",
+            "version": "nlpcc-track1-2026-anonymity-groups-v1",
         }
         for asset in FUND_POOL
     ]
@@ -332,6 +351,7 @@ def coarsen_market_features(
     candidates = []
     for candidate in payload.get("candidate_pool", []):
         item = dict(candidate)
+        asset = str(item.get("asset", ""))
         observations = list(item.pop("prices", []))
         returns = [
             float(row["pct_change"])
@@ -364,6 +384,7 @@ def coarsen_market_features(
         )
         features: Dict[str, Any] = {}
         if level in {"P1", "P2"}:
+            item["category"] = DISCLOSURE_GROUPS[asset][0]
             features["momentum"] = _bucket(
                 momentum,
                 (-3.0, -1.0, 1.0, 3.0),
@@ -388,6 +409,7 @@ def coarsen_market_features(
                     ("few", "mixed", "many"),
                 )
         elif level == "P3":
+            item["category"] = DISCLOSURE_GROUPS[asset][1]
             features["momentum"] = _bucket(
                 momentum, (-1.0, 1.0), ("down", "flat", "up")
             )
@@ -395,10 +417,13 @@ def coarsen_market_features(
                 volatility, (0.8, 1.8), ("low", "medium", "high")
             )
         elif level == "P4":
+            item["category"] = "公开市场资产"
             features["trend"] = _bucket(
                 momentum, (-1.0, 1.0), ("down", "flat", "up")
             )
-        elif level != "P5":
+        elif level == "P5":
+            item.pop("category", None)
+        else:
             raise ValueError(f"unknown disclosure level: {disclosure_level}")
         item["market_features"] = features
         candidates.append(item)
@@ -442,11 +467,14 @@ def replace_known_assets(value: Any, replacements: Mapping[str, str]) -> Any:
 
 
 def build_episode_aliases(date: int) -> Dict[str, str]:
-    """Create deterministic per-day aliases for the opaque episode baseline."""
+    """Create keyed per-day aliases for the opaque episode baseline."""
 
     return {
-        asset: "EP_ASSET_" + hashlib.sha256(
-            f"nlpcc-episode-alias-v1:{date}:{asset}".encode()
+        asset: "EP_ASSET_"
+        + hmac.new(
+            _EPISODE_ALIAS_KEY,
+            f"nlpcc-episode-alias-v2:{date}:{asset}".encode(),
+            hashlib.sha256,
         ).hexdigest()[:10].upper()
         for asset in FUND_POOL
     }
@@ -520,6 +548,11 @@ def prepare_outbound(
             replacements[asset] = alias
             replacements[FUND_PROFILES[asset][0]] = alias
         outbound = replace_known_assets(payload, replacements)
+        if method in {"llm_rewrite", "episode_alias"}:
+            outbound["candidate_pool"].sort(key=lambda item: str(item["asset"]))
+            outbound["portfolio"]["holdings"].sort(
+                key=lambda item: str(item["asset"])
+            )
         representation = dict(fixed_aliases)
     elif method == "finscope":
         trading_day = datetime.strptime(str(date), "%Y%m%d").strftime("%Y-%m-%d")
@@ -539,6 +572,10 @@ def prepare_outbound(
             asset: str(candidate["asset"])
             for asset, candidate in zip(FUND_POOL, outbound["candidate_pool"])
         }
+        outbound["candidate_pool"].sort(key=lambda item: str(item["asset"]))
+        outbound["portfolio"]["holdings"].sort(
+            key=lambda item: str(item["asset"])
+        )
     else:  # pragma: no cover - argparse guards this
         raise ValueError(method)
     elapsed = (time.perf_counter() - started) * 1000

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import unittest
 
 from benchmarks.run_nlpcc_real import (
@@ -63,8 +64,11 @@ class RealNlpccRunnerTests(unittest.TestCase):
             "finscope", action, scope, self.agent, {value: key for key, value in self.fixed.items()}
         )
         self.assertTrue(valid, rejection)
-        self.assertEqual(restored["asset"], FUND_POOL[0])
-        self.assertEqual(representations[FUND_POOL[0]], action["asset"])
+        expected_asset = next(
+            asset for asset, representation in representations.items()
+            if representation == action["asset"]
+        )
+        self.assertEqual(restored["asset"], expected_asset)
         self.agent.close_scope(scope)
 
     def test_handles_rotate_across_days(self) -> None:
@@ -140,6 +144,37 @@ class RealNlpccRunnerTests(unittest.TestCase):
             coarsen_market_features(raw, "P5")["candidate_pool"][0]["market_features"],
             {},
         )
+
+    def test_disclosed_static_signatures_have_no_singleton_assets(self) -> None:
+        handle = re.compile(r'id="[^"]+"')
+        for level in ("P1", "P2", "P3", "P4", "P5"):
+            outbound, scope, _, _ = prepare_outbound(
+                "finscope", payload(), 20250102, self.agent, self.fixed, level
+            )
+            signatures = []
+            for candidate in outbound["candidate_pool"]:
+                static = {
+                    key: value
+                    for key, value in candidate.items()
+                    if key != "market_features"
+                }
+                static["asset"] = handle.sub('id="HANDLE"', static["asset"])
+                static["name"] = handle.sub('id="HANDLE"', static["name"])
+                signatures.append(
+                    json.dumps(static, ensure_ascii=False, sort_keys=True)
+                )
+            for signature in set(signatures):
+                self.assertGreaterEqual(signatures.count(signature), 2, (level, signature))
+            self.agent.close_scope(scope)
+
+    def test_finscope_randomizes_candidate_position_with_scope_handles(self) -> None:
+        outbound, scope, representations, _ = prepare_outbound(
+            "finscope", payload(), 20250102, self.agent, self.fixed, "P5"
+        )
+        observed = [item["asset"] for item in outbound["candidate_pool"]]
+        self.assertEqual(observed, sorted(observed))
+        self.assertEqual(set(observed), set(representations.values()))
+        self.agent.close_scope(scope)
 
     def test_expanded_metrics_include_rewrite_call_cost(self) -> None:
         records = []
