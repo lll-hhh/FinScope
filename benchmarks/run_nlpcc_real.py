@@ -1,0 +1,1031 @@
+"""Run FinScope on the public NLPCC 2026 Track 1 data.
+
+This runner uses the official no-future-leakage DataLoader, real daily news,
+real ETF/index prices, and a local Qwen decision model.  It is deliberately
+separate from ``run_benchmark.py``, whose inputs are synthetic smoke cases.
+"""
+
+from __future__ import annotations
+
+import argparse
+from dataclasses import asdict, dataclass, field
+from datetime import datetime, timezone
+import hashlib
+import json
+import math
+from pathlib import Path
+import re
+import statistics
+import sys
+import time
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
+
+from finscope import (
+    ActionValidationError,
+    AmbiguousRestorationError,
+    LocalPrivacyAgent,
+)
+from benchmarks.run_benchmark import BackendResult, TransformersBackend
+
+
+METHODS = ("vanilla", "deletion", "fixed_alias", "finscope")
+FUND_POOL = (
+    "000300.SH",
+    "000905.SH",
+    "399006.SZ",
+    "000688.SH",
+    "000932.SH",
+    "000941.SH",
+    "399971.SZ",
+    "000819.SH",
+    "000928.SH",
+    "000012.SH",
+    "518880.SH",
+)
+FUND_PROFILES = {
+    "000300.SH": ("沪深300", "大盘蓝筹"),
+    "000905.SH": ("中证500", "中小盘"),
+    "399006.SZ": ("创业板指", "成长科技"),
+    "000688.SH": ("科创50", "硬科技"),
+    "000932.SH": ("中证消费", "消费"),
+    "000941.SH": ("新能源指数", "新能源主题"),
+    "399971.SZ": ("中证传媒", "传媒"),
+    "000819.SH": ("有色金属指数", "有色金属行业"),
+    "000928.SH": ("中证能源指数", "传统能源"),
+    "000012.SH": ("国债指数", "固定收益"),
+    "518880.SH": ("黄金ETF", "贵金属"),
+}
+CANONICAL_ASSET = {
+    identifier.casefold(): asset
+    for asset, profile in FUND_PROFILES.items()
+    for identifier in (asset, asset.split(".", 1)[0], profile[0])
+}
+NEWS_SOURCES = ("caixin", "tiantian", "sinafinance", "tencent")
+MODEL_REVISION = "1098534ab5d7220ea0f4a6b9f07bb03729a79c1d"
+PROMPT_VERSION = "nlpcc-track1-single-action-v1"
+FINSCOPE_COMMIT = "0e68fbd209c7db337e7b8b31cba169bbb410a3c9"
+
+
+@dataclass
+class Portfolio:
+    cash: float = 100_000.0
+    holdings: Dict[str, float] = field(
+        default_factory=lambda: {asset: 0.0 for asset in FUND_POOL}
+    )
+    turnover: float = 0.0
+
+    @property
+    def value(self) -> float:
+        return self.cash + sum(self.holdings.values())
+
+
+@dataclass
+class DayRecord:
+    method: str
+    date: str
+    outbound_prompt_sha256: str
+    direct_identifier_leak: bool
+    input_tokens: int
+    output_tokens: int
+    model_latency_ms: float
+    preprocess_ms: float
+    postprocess_ms: float
+    parsed: bool
+    valid: bool
+    executed: bool
+    rejection_reason: Optional[str]
+    raw_output: str
+    outbound_action: Optional[Dict[str, Any]]
+    restored_action: Optional[Dict[str, Any]]
+    portfolio_value: float
+    cash: float
+    portfolio_weights: Dict[str, float]
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Real NLPCC 2026 Track 1 news-price-backtest evaluation"
+    )
+    parser.add_argument(
+        "--nlpcc-root",
+        default="../data/nlpcc2026_20260818",
+        help="directory containing repo/ and lfs/ from the official dataset",
+    )
+    parser.add_argument("--model", default="../models/Qwen3.8-27B")
+    parser.add_argument("--device", default="cuda:0")
+    parser.add_argument("--start-date", default="2025-01-02")
+    parser.add_argument("--end-date", default="2025-12-31")
+    parser.add_argument("--max-days", type=int, default=0)
+    parser.add_argument("--lookback-days", type=int, default=6)
+    parser.add_argument("--top-rank", type=int, default=20)
+    parser.add_argument("--pre-k-days", type=int, default=1)
+    parser.add_argument("--max-new-tokens", type=int, default=128)
+    parser.add_argument(
+        "--disclosure-level",
+        choices=("P1", "P2", "P3", "P4", "P5"),
+        default="P3",
+    )
+    parser.add_argument("--methods", nargs="+", choices=METHODS, default=list(METHODS))
+    parser.add_argument(
+        "--output",
+        default="benchmarks/results/nlpcc_real_2025_qwen38_p3.json",
+    )
+    parser.add_argument(
+        "--checkpoint",
+        default="",
+        help="checkpoint path; defaults to OUTPUT.checkpoint.json",
+    )
+    parser.add_argument(
+        "--no-resume",
+        action="store_false",
+        dest="resume",
+        help="ignore an existing compatible checkpoint",
+    )
+    parser.set_defaults(resume=True)
+    return parser.parse_args()
+
+
+def load_official_data(args: argparse.Namespace) -> Tuple[Any, List[int], Dict[str, str]]:
+    root = Path(args.nlpcc_root)
+    tasks_root = root / "repo" / "NLPCC_tasks"
+    lfs_dataset = root / "lfs" / "NLPCC_tasks" / "dataset"
+    sys.path.insert(0, str(tasks_root))
+    from dataset.dataloader_eval import DataLoader
+
+    price_dir = lfs_dataset / "price_data" / "export_data"
+    news_dir = lfs_dataset / "news_data" / "export_data"
+    loader = DataLoader(str(price_dir), str(news_dir))
+    start = int(args.start_date.replace("-", ""))
+    end = int(args.end_date.replace("-", ""))
+    dates = loader.get_trading_dates(start, end)
+    if args.max_days > 0:
+        dates = dates[: args.max_days]
+    if not dates:
+        raise RuntimeError("no official trading dates in the requested window")
+    files = {
+        "official_loader": str(tasks_root / "dataset" / "dataloader_eval.py"),
+        "price_dir": str(price_dir),
+        "news_dir": str(news_dir),
+    }
+    return loader, dates, files
+
+
+def asset_catalog() -> List[Dict[str, Any]]:
+    return [
+        {
+            "canonical_id": asset,
+            "name": FUND_PROFILES[asset][0],
+            "aliases": [asset, asset.split(".", 1)[0]],
+            "asset_type": "ETF" if asset == "518880.SH" else "指数",
+            "market": "中国市场",
+            "sector_l1": FUND_PROFILES[asset][1],
+            "version": "nlpcc-track1-2026",
+        }
+        for asset in FUND_POOL
+    ]
+
+
+def build_payload(
+    loader: Any,
+    date: int,
+    portfolio: Portfolio,
+    args: argparse.Namespace,
+) -> Dict[str, Any]:
+    history = loader.get_historical_prices(
+        list(FUND_POOL), date, args.lookback_days
+    )
+    candidates = []
+    for asset in FUND_POOL:
+        observations = []
+        for row in history.get(asset, []):
+            if int(row.get("date_int") or 0) == date and any(
+                row.get(field) is not None
+                for field in ("close", "high", "low", "pct_change", "change")
+            ):
+                raise RuntimeError(
+                    "official DataLoader exposed decision-day future price fields"
+                )
+            observations.append(
+                {
+                    "date": row.get("date"),
+                    "open": row.get("open"),
+                    "close": row.get("close"),
+                    "pct_change": row.get("pct_change"),
+                }
+            )
+        candidates.append(
+            {
+                "asset": asset,
+                "name": FUND_PROFILES[asset][0],
+                "category": FUND_PROFILES[asset][1],
+                "prices": observations,
+            }
+        )
+
+    news_rows = loader.get_news(
+        list(NEWS_SOURCES),
+        date,
+        top_rank=args.top_rank,
+        pre_k_days=args.pre_k_days,
+    )
+    # The public files contain several list types per source, so RANKING <= 20
+    # can return hundreds of rows.  The task specification says daily Top-20;
+    # deduplicate identical headlines and cap the merged ranked stream at 20.
+    news = []
+    seen_titles = set()
+    for row in news_rows:
+        title = str(row.get("TITLE", "")).strip()
+        if not title or title in seen_titles:
+            continue
+        seen_titles.add(title)
+        news.append(
+            {
+                "source": str(row.get("APP_TYPE", "")),
+                "date": str(row.get("THEDATE", "")),
+                "rank": int(row.get("RANKING", 999)),
+                "title": title,
+            }
+        )
+        if len(news) >= args.top_rank:
+            break
+    holdings = [
+        {"asset": asset, "value": round(value, 2)}
+        for asset, value in portfolio.holdings.items()
+        if value > 1e-6
+    ]
+    return {
+        "date": datetime.strptime(str(date), "%Y%m%d").strftime("%Y-%m-%d"),
+        "candidate_pool": candidates,
+        "news": news,
+        "portfolio": {
+            "cash": round(portfolio.cash, 2),
+            "holdings": holdings,
+            "total_value": round(portfolio.value, 2),
+        },
+        "execution_rules": {
+            "commission_rate": 0.0001,
+            "buy_uses_current_cash_only": True,
+            "one_action_max": True,
+        },
+    }
+
+
+def build_prompt(payload: Mapping[str, Any]) -> str:
+    return (
+        "你是NLPCC 2026 Track 1的日频资产配置智能体。根据真实历史行情、截至"
+        "当日15:00的财经新闻和当前持仓，最多给出一个交易动作。决策时不能使用当日"
+        "收盘价等未来信息。买入amount不得超过cash；卖出percentage必须在(0,1]；"
+        "不交易时action为hold。asset必须逐字复制candidate_pool中的一个asset值。"
+        "只输出一个严格JSON对象，不要Markdown，不要解释，格式为："
+        '{"asset":"候选值","action":"buy|sell|hold","amount":数字,'
+        '"percentage":数字,"reason":"简短原因"}。\n'
+        "BEGIN_NLPCC_INPUT\n"
+        + json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+        + "\nEND_NLPCC_INPUT"
+    )
+
+
+def replace_known_assets(value: Any, replacements: Mapping[str, str]) -> Any:
+    ordered = sorted(replacements, key=len, reverse=True)
+
+    def replace_text(text: str) -> str:
+        for source in ordered:
+            text = re.sub(re.escape(source), replacements[source], text, flags=re.I)
+        return text
+
+    if isinstance(value, str):
+        return replace_text(value)
+    if isinstance(value, list):
+        return [replace_known_assets(item, replacements) for item in value]
+    if isinstance(value, Mapping):
+        return {
+            replace_text(str(key)): replace_known_assets(item, replacements)
+            for key, item in value.items()
+        }
+    return value
+
+
+def prepare_outbound(
+    method: str,
+    payload: Dict[str, Any],
+    date: int,
+    privacy_agent: LocalPrivacyAgent,
+    fixed_aliases: Mapping[str, str],
+    disclosure_level: str,
+) -> Tuple[Dict[str, Any], Optional[Any], Dict[str, str], float]:
+    started = time.perf_counter()
+    scope = None
+    representation: Dict[str, str]
+    if method == "vanilla":
+        outbound = payload
+        representation = {asset: asset for asset in FUND_POOL}
+    elif method == "deletion":
+        replacements = {}
+        for asset in FUND_POOL:
+            replacements[asset] = "REDACTED"
+            replacements[FUND_PROFILES[asset][0]] = "REDACTED"
+        outbound = replace_known_assets(payload, replacements)
+        for index, candidate in enumerate(outbound["candidate_pool"], start=1):
+            candidate["asset"] = f"REDACTED_{index:02d}"
+            candidate["name"] = "REDACTED"
+        outbound["portfolio"]["holdings"] = [
+            {"asset": "REDACTED", "value": item["value"]}
+            for item in outbound["portfolio"]["holdings"]
+        ]
+        representation = {asset: "REDACTED" for asset in FUND_POOL}
+    elif method == "fixed_alias":
+        replacements = {}
+        for asset, alias in fixed_aliases.items():
+            replacements[asset] = alias
+            replacements[FUND_PROFILES[asset][0]] = alias
+        outbound = replace_known_assets(payload, replacements)
+        representation = dict(fixed_aliases)
+    elif method == "finscope":
+        trading_day = datetime.strptime(str(date), "%Y%m%d").strftime("%Y-%m-%d")
+        scope = privacy_agent.open_scope(
+            "nlpcc-track1-real",
+            trading_day,
+            conversation_id="qwen38-track1",
+        )
+        outbound = privacy_agent.sanitize(
+            payload,
+            scope,
+            disclosure_level=disclosure_level,
+            purpose="portfolio-allocation",
+        )
+        representation = {
+            asset: str(candidate["asset"])
+            for asset, candidate in zip(FUND_POOL, outbound["candidate_pool"])
+        }
+    else:  # pragma: no cover - argparse guards this
+        raise ValueError(method)
+    elapsed = (time.perf_counter() - started) * 1000
+    return outbound, scope, representation, elapsed
+
+
+def parse_action(text: str) -> Optional[Dict[str, Any]]:
+    candidate = text.strip()
+    if candidate.startswith("```"):
+        candidate = re.sub(r"^```(?:json)?\s*|\s*```$", "", candidate, flags=re.I)
+    documents = [candidate]
+    match = re.search(r"\{.*\}", candidate, re.S)
+    if match and match.group(0) != candidate:
+        documents.append(match.group(0))
+    for document in documents:
+        try:
+            value = json.loads(document)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(value, Mapping):
+            continue
+        if isinstance(value.get("trades"), list) and value["trades"]:
+            non_hold = [
+                item
+                for item in value["trades"]
+                if isinstance(item, Mapping)
+                and str(item.get("action", "hold")).casefold() != "hold"
+            ]
+            value = non_hold[0] if non_hold else value["trades"][0]
+        action = dict(value)
+        if "asset" not in action and "fund_id" in action:
+            action["asset"] = action.pop("fund_id")
+        if "action" not in action and "side" in action:
+            action["action"] = action.pop("side")
+        return action
+    return None
+
+
+def restore_and_validate(
+    method: str,
+    action: Optional[Dict[str, Any]],
+    scope: Optional[Any],
+    privacy_agent: LocalPrivacyAgent,
+    fixed_restore: Mapping[str, str],
+) -> Tuple[Optional[Dict[str, Any]], bool, Optional[str]]:
+    if action is None:
+        return None, False, "model output is not parseable JSON"
+    restored = dict(action)
+    try:
+        if method == "finscope":
+            if scope is None:  # pragma: no cover - defensive
+                raise ActionValidationError("missing FinScope scope")
+            restored = privacy_agent.validate_action(restored, scope).action
+            restored["asset"] = CANONICAL_ASSET.get(
+                str(restored.get("asset", "")).casefold(),
+                restored.get("asset"),
+            )
+        elif method == "fixed_alias":
+            asset = str(restored.get("asset", ""))
+            if asset not in fixed_restore:
+                raise ActionValidationError("unknown fixed alias")
+            restored["asset"] = fixed_restore[asset]
+        elif method == "deletion":
+            raise ActionValidationError("deleted identifier cannot be restored")
+
+        asset = restored.get("asset")
+        side = str(restored.get("action", "")).casefold()
+        if asset not in FUND_POOL:
+            raise ActionValidationError("asset is outside the NLPCC Track 1 pool")
+        if side not in {"buy", "sell", "hold"}:
+            raise ActionValidationError("unsupported action")
+        restored["action"] = side
+        if side == "buy":
+            amount = float(restored.get("amount", 0))
+            if not math.isfinite(amount) or amount <= 0:
+                raise ActionValidationError("buy amount must be positive")
+            restored["amount"] = amount
+        if side == "sell":
+            percentage = float(restored.get("percentage", 0))
+            if not math.isfinite(percentage) or not 0 < percentage <= 1:
+                raise ActionValidationError("sell percentage must be in (0, 1]")
+            restored["percentage"] = percentage
+        return restored, True, None
+    except (ActionValidationError, AmbiguousRestorationError, TypeError, ValueError) as exc:
+        return restored, False, str(exc)
+
+
+def mark_to_market(portfolio: Portfolio, prices: Mapping[str, Mapping[str, Any]]) -> None:
+    for asset, value in portfolio.holdings.items():
+        if value <= 0:
+            continue
+        pct_change = prices.get(asset, {}).get("pct_change")
+        if pct_change is not None:
+            portfolio.holdings[asset] = value * (1 + float(pct_change) / 100)
+
+
+def execute_action(portfolio: Portfolio, action: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
+    asset = action["asset"]
+    side = action["action"]
+    fee = 0.0001
+    if side == "hold":
+        return True, None
+    if side == "buy":
+        amount = float(action["amount"])
+        if amount > portfolio.cash + 0.01:
+            return False, "buy amount exceeds current cash"
+        amount = min(amount, portfolio.cash)
+        portfolio.cash -= amount
+        portfolio.holdings[asset] += amount * (1 - fee)
+        portfolio.turnover += amount
+        return True, None
+    percentage = float(action["percentage"])
+    current = portfolio.holdings[asset]
+    if current <= 1e-6:
+        return False, "cannot sell an empty holding"
+    sold = current * percentage
+    portfolio.holdings[asset] -= sold
+    portfolio.cash += sold * (1 - fee)
+    portfolio.turnover += sold
+    return True, None
+
+
+def contains_direct_identifier(prompt: str) -> bool:
+    identifiers = list(FUND_POOL) + [profile[0] for profile in FUND_PROFILES.values()]
+    return any(identifier.casefold() in prompt.casefold() for identifier in identifiers)
+
+
+def percentile(values: Sequence[float], q: float) -> float:
+    if not values:
+        return 0.0
+    ordered = sorted(values)
+    index = max(0, min(len(ordered) - 1, math.ceil(q * len(ordered)) - 1))
+    return ordered[index]
+
+
+def performance_metrics(values: Sequence[float], turnover: float) -> Dict[str, float]:
+    returns = [values[index] / values[index - 1] - 1 for index in range(1, len(values))]
+    total_return = values[-1] / values[0] - 1 if values else 0.0
+    if len(returns) > 1 and statistics.stdev(returns) > 0:
+        sharpe = statistics.mean(returns) / statistics.stdev(returns) * math.sqrt(252)
+    else:
+        sharpe = 0.0
+    downside = [min(item, 0.0) for item in returns]
+    downside_rms = math.sqrt(sum(item * item for item in downside) / len(downside)) if downside else 0
+    sortino = statistics.mean(returns) / downside_rms * math.sqrt(252) if downside_rms else 0.0
+    peak = values[0] if values else 1.0
+    max_drawdown = 0.0
+    for value in values:
+        peak = max(peak, value)
+        max_drawdown = max(max_drawdown, 1 - value / peak)
+    return {
+        "total_return": total_return,
+        "sharpe": sharpe,
+        "sortino": sortino,
+        "max_drawdown": max_drawdown,
+        "turnover_over_initial_capital": turnover / 100_000.0,
+        "final_portfolio_value": values[-1] if values else 100_000.0,
+    }
+
+
+def summarize(
+    methods: Sequence[str],
+    records: Sequence[DayRecord],
+    values: Mapping[str, Sequence[float]],
+    portfolios: Mapping[str, Portfolio],
+    representations: Mapping[str, Sequence[Mapping[str, str]]],
+) -> List[Dict[str, Any]]:
+    table = []
+    vanilla_rows = {
+        row.date: row for row in records if row.method == "vanilla"
+    }
+    for method in methods:
+        rows = [row for row in records if row.method == method]
+        perf = performance_metrics(values[method], portfolios[method].turnover)
+        links = []
+        method_representations = representations[method]
+        for previous, current in zip(method_representations, method_representations[1:]):
+            current_counts = {
+                value: list(current.values()).count(value) for value in set(current.values())
+            }
+            for asset in FUND_POOL:
+                links.append(
+                    previous[asset] == current[asset]
+                    and current_counts[current[asset]] == 1
+                )
+        weight_errors = []
+        decision_matches = []
+        for row in rows:
+            vanilla = vanilla_rows.get(row.date)
+            if vanilla is None:
+                continue
+            weight_errors.extend(
+                abs(row.portfolio_weights.get(asset, 0.0) - vanilla.portfolio_weights.get(asset, 0.0))
+                for asset in FUND_POOL
+            )
+            current_action = row.restored_action or {}
+            vanilla_action = vanilla.restored_action or {}
+            decision_matches.append(
+                row.valid
+                and vanilla.valid
+                and current_action.get("asset") == vanilla_action.get("asset")
+                and current_action.get("action") == vanilla_action.get("action")
+            )
+        table.append(
+            {
+                "method": method,
+                **perf,
+                "valid_action_rate": sum(row.valid for row in rows) / len(rows),
+                "execution_success_rate": sum(row.executed for row in rows) / len(rows),
+                "decision_agreement_with_vanilla": (
+                    sum(decision_matches) / len(decision_matches)
+                    if decision_matches
+                    else 0.0
+                ),
+                "portfolio_weight_mae_vs_vanilla": (
+                    statistics.mean(weight_errors) if weight_errors else 0.0
+                ),
+                "direct_identifier_leak_rate": sum(
+                    row.direct_identifier_leak for row in rows
+                )
+                / len(rows),
+                "cross_day_unique_link_rate": sum(links) / len(links) if links else 0.0,
+                "avg_input_tokens": statistics.mean(row.input_tokens for row in rows),
+                "avg_output_tokens": statistics.mean(row.output_tokens for row in rows),
+                "local_p95_ms": percentile(
+                    [row.preprocess_ms + row.postprocess_ms for row in rows], 0.95
+                ),
+                "e2e_p95_ms": percentile(
+                    [
+                        row.preprocess_ms + row.model_latency_ms + row.postprocess_ms
+                        for row in rows
+                    ],
+                    0.95,
+                ),
+            }
+        )
+    return table
+
+
+def render_markdown(result: Mapping[str, Any]) -> str:
+    metadata = result["metadata"]
+    model_name = Path(str(metadata["model"])).name
+    lines = [
+        "# Real NLPCC 2026 Track 1 Main Table",
+        "",
+        f"- Model: `{model_name}` (`{metadata['model_revision']}`)",
+        f"- Window: `{metadata['start_date']}` to `{metadata['end_date']}` "
+        f"({metadata['trading_days']} trading days)",
+        "- Data: official public NLPCC 2026 Track 1 news and ETF/index prices; "
+        "current-day close/high/low/return hidden from prompts",
+        "- Trading: CNY 100,000 initial capital, daily close execution, 0.01% friction",
+        "",
+        "| Method | Return ↑ | Sharpe ↑ | Sortino ↑ | MDD ↓ | Turnover | Agree w/ Vanilla ↑ | Weight MAE ↓ | Valid ↑ | Executed ↑ | Direct leak ↓ | Cross-day link ↓ | In tok. ↓ | Local p95 ms ↓ | E2E p95 ms ↓ |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+    ]
+    for row in result["main_table"]:
+        lines.append(
+            "| {method} | {ret:.2%} | {sharpe:.3f} | {sortino:.3f} | {mdd:.2%} | "
+            "{turnover:.3f} | {agree:.1%} | {weight_mae:.4f} | {valid:.1%} | {executed:.1%} | {leak:.1%} | "
+            "{link:.1%} | {tokens:.1f} | {local:.2f} | {e2e:.2f} |".format(
+                method=row["method"],
+                ret=row["total_return"],
+                sharpe=row["sharpe"],
+                sortino=row["sortino"],
+                mdd=row["max_drawdown"],
+                turnover=row["turnover_over_initial_capital"],
+                agree=row["decision_agreement_with_vanilla"],
+                weight_mae=row["portfolio_weight_mae_vs_vanilla"],
+                valid=row["valid_action_rate"],
+                executed=row["execution_success_rate"],
+                leak=row["direct_identifier_leak_rate"],
+                link=row["cross_day_unique_link_rate"],
+                tokens=row["avg_input_tokens"],
+                local=row["local_p95_ms"],
+                e2e=row["e2e_p95_ms"],
+            )
+        )
+    expanded = result.get("expanded_metrics")
+    if expanded:
+        by_method = expanded["by_method"]
+        lines.extend(
+            [
+                "",
+                "## Financial Detail",
+                "",
+                "| Method | Final CNY | Ann. return | Ann. vol. | Calmar | Positive days | VaR 95 | CVaR 95 | Best day | Worst day | Max DD duration | Trades | Final cash |",
+                "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+            ]
+        )
+        for row in result["main_table"]:
+            method = row["method"]
+            metric = by_method[method]["finance"]
+            lines.append(
+                "| {method} | {final:,.2f} | {annual:.2%} | {vol:.2%} | {calmar:.3f} | "
+                "{positive:.1%} | {var:.2%} | {cvar:.2%} | {best:.2%} | {worst:.2%} | "
+                "{duration} | {trades} | {cash:,.2f} |".format(
+                    method=method,
+                    final=row["final_portfolio_value"],
+                    annual=metric["annualized_return"],
+                    vol=metric["annualized_volatility"],
+                    calmar=metric["calmar_ratio"],
+                    positive=metric["positive_day_rate"],
+                    var=metric["historical_var_95"],
+                    cvar=metric["historical_cvar_95"],
+                    best=metric["best_daily_return"],
+                    worst=metric["worst_daily_return"],
+                    duration=metric["max_drawdown_duration_days"],
+                    trades=metric["executed_trade_count"],
+                    cash=metric["final_cash"],
+                )
+            )
+
+        lines.extend(
+            [
+                "",
+                "## Continuity And Utility",
+                "",
+                "| Method | Parse success | Valid / parsed | Execute / valid | Interrupted | Asset agree* | Action agree* | Full agree | Weight MAE | Malformed | Audit rejects | Execution rejects |",
+                "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+            ]
+        )
+        for row in result["main_table"]:
+            method = row["method"]
+            metric = by_method[method]["continuity"]
+            lines.append(
+                "| {method} | {parsed:.1%} | {valid_parsed:.1%} | {executed_valid:.1%} | "
+                "{interrupted:.1%} | {asset:.1%} | {action:.1%} | {full:.1%} | "
+                "{mae:.4f} | {malformed} | {audit} | {execution} |".format(
+                    method=method,
+                    parsed=metric["parse_success_rate"],
+                    valid_parsed=metric["valid_given_parsed_rate"],
+                    executed_valid=metric["execution_given_valid_rate"],
+                    interrupted=metric["workflow_interruption_rate"],
+                    asset=metric["asset_agreement_given_common_valid"],
+                    action=metric["action_agreement_given_common_valid"],
+                    full=row["decision_agreement_with_vanilla"],
+                    mae=row["portfolio_weight_mae_vs_vanilla"],
+                    malformed=metric["malformed_output_count"],
+                    audit=metric["restoration_audit_rejection_count"],
+                    execution=metric["execution_rejection_count"],
+                )
+            )
+        lines.extend(
+            [
+                "",
+                "*Asset and action agreement are conditional on both the method and Vanilla producing valid actions; full agreement uses all 243 days.*",
+                "",
+                "## Privacy",
+                "",
+                "| Method | Direct leaks | Direct leak rate | Cross-day unique link |",
+                "| --- | ---: | ---: | ---: |",
+            ]
+        )
+        for method in metadata["methods"]:
+            metric = by_method[method]["privacy"]
+            lines.append(
+                "| {method} | {count} / {days} | {leak:.1%} | {link:.1%} |".format(
+                    method=method,
+                    count=metric["direct_identifier_leak_count"],
+                    days=metadata["trading_days"],
+                    leak=metric["direct_identifier_leak_rate"],
+                    link=metric["cross_day_unique_link_rate"],
+                )
+            )
+
+        lines.extend(
+            [
+                "",
+                "## Cost And Latency",
+                "",
+                "| Method | Total input tok. | Avg input | Input overhead | Avg output | Model avg ms | Model p95 ms | Local avg ms | Local p95 ms | E2E avg ms | E2E p50 ms | E2E p95 ms | Model hours | Output tok/s |",
+                "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+            ]
+        )
+        for method in metadata["methods"]:
+            metric = by_method[method]["cost"]
+            lines.append(
+                "| {method} | {total_input:,} | {avg_input:.1f} | {overhead:+.1%} | "
+                "{avg_output:.1f} | {model_avg:.2f} | {model_p95:.2f} | {local_avg:.2f} | "
+                "{local_p95:.2f} | {e2e_avg:.2f} | {e2e_p50:.2f} | {e2e_p95:.2f} | "
+                "{hours:.3f} | {throughput:.2f} |".format(
+                    method=method,
+                    total_input=metric["total_input_tokens"],
+                    avg_input=metric["average_input_tokens"],
+                    overhead=metric["input_token_overhead_vs_vanilla"],
+                    avg_output=metric["average_output_tokens"],
+                    model_avg=metric["average_model_latency_ms"],
+                    model_p95=metric["p95_model_latency_ms"],
+                    local_avg=metric["average_local_overhead_ms"],
+                    local_p95=metric["p95_local_overhead_ms"],
+                    e2e_avg=metric["average_e2e_latency_ms"],
+                    e2e_p50=metric["p50_e2e_latency_ms"],
+                    e2e_p95=metric["p95_e2e_latency_ms"],
+                    hours=metric["total_model_time_hours"],
+                    throughput=metric["aggregate_output_tokens_per_second"],
+                )
+            )
+
+        lines.extend(["", "## Rejection Breakdown", ""])
+        for method in metadata["methods"]:
+            rejections = by_method[method]["continuity"]["rejection_counts"]
+            rendered = "; ".join(
+                f"`{reason}`: {count}" for reason, count in rejections.items()
+            )
+            lines.append(f"- **{method}**: {rendered or 'none'}")
+        lines.extend(
+            [
+                "",
+                "## Not Measured In This Run",
+                "",
+                ", ".join(expanded["not_measured"]) + ".",
+            ]
+        )
+    lines.extend(
+        [
+            "",
+            "This is a full-year public A-set replay, not an official NLPCC "
+            "leaderboard submission. Direct leak checks literal candidate identifiers; "
+            "semantic re-identification requires a separate attacker experiment.",
+        ]
+    )
+    return "\n".join(lines) + "\n"
+
+
+def checkpoint_path(args: argparse.Namespace) -> Path:
+    if args.checkpoint:
+        return Path(args.checkpoint)
+    return Path(str(args.output) + ".checkpoint.json")
+
+
+def run_fingerprint(args: argparse.Namespace, dates: Sequence[int]) -> str:
+    payload = {
+        "commit": FINSCOPE_COMMIT,
+        "model": str(Path(args.model).resolve()),
+        "model_revision": MODEL_REVISION,
+        "dates": list(dates),
+        "methods": list(args.methods),
+        "disclosure_level": args.disclosure_level,
+        "lookback_days": args.lookback_days,
+        "top_rank": args.top_rank,
+        "pre_k_days": args.pre_k_days,
+        "max_new_tokens": args.max_new_tokens,
+    }
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def write_checkpoint(
+    path: Path,
+    fingerprint: str,
+    completed_days: int,
+    portfolios: Mapping[str, Portfolio],
+    values: Mapping[str, Sequence[float]],
+    representations: Mapping[str, Sequence[Mapping[str, str]]],
+    records: Sequence[DayRecord],
+) -> None:
+    payload = {
+        "fingerprint": fingerprint,
+        "completed_days": completed_days,
+        "portfolios": {key: asdict(value) for key, value in portfolios.items()},
+        "values": values,
+        "representations": representations,
+        "records": [asdict(record) for record in records],
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    temporary.replace(path)
+
+
+def load_checkpoint(
+    path: Path,
+    fingerprint: str,
+    methods: Sequence[str],
+) -> Optional[Tuple[int, Dict[str, Portfolio], Dict[str, List[float]], Dict[str, List[Mapping[str, str]]], List[DayRecord]]]:
+    if not path.exists():
+        return None
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if payload.get("fingerprint") != fingerprint:
+        raise RuntimeError(
+            "checkpoint configuration does not match this run; use --checkpoint "
+            "with another path or --no-resume"
+        )
+    portfolios = {
+        method: Portfolio(**payload["portfolios"][method]) for method in methods
+    }
+    values = {method: list(payload["values"][method]) for method in methods}
+    representations = {
+        method: list(payload["representations"][method]) for method in methods
+    }
+    records = [DayRecord(**row) for row in payload["records"]]
+    return int(payload["completed_days"]), portfolios, values, representations, records
+
+
+def run(args: argparse.Namespace) -> Dict[str, Any]:
+    loader, dates, files = load_official_data(args)
+    fingerprint = run_fingerprint(args, dates)
+    saved = (
+        load_checkpoint(checkpoint_path(args), fingerprint, args.methods)
+        if args.resume
+        else None
+    )
+    backend = TransformersBackend(args.model, args.device, args.max_new_tokens)
+    privacy_agent = LocalPrivacyAgent(
+        asset_catalog(), default_level=args.disclosure_level
+    )
+    fixed_aliases = {
+        asset: f"FIXED_ASSET_{index:03d}"
+        for index, asset in enumerate(FUND_POOL, start=1)
+    }
+    fixed_restore = {alias: asset for asset, alias in fixed_aliases.items()}
+    if saved is None:
+        completed_days = 0
+        portfolios = {method: Portfolio() for method in args.methods}
+        values = {method: [100_000.0] for method in args.methods}
+        representations: Dict[str, List[Mapping[str, str]]] = {
+            method: [] for method in args.methods
+        }
+        records: List[DayRecord] = []
+    else:
+        completed_days, portfolios, values, representations, records = saved
+        print(
+            f"resuming after {completed_days}/{len(dates)} completed trading days",
+            flush=True,
+        )
+
+    for day_index, date in enumerate(dates[completed_days:], start=completed_days + 1):
+        prices = loader.get_price_data(list(FUND_POOL), date)
+        for method in args.methods:
+            portfolio = portfolios[method]
+            raw_payload = build_payload(loader, date, portfolio, args)
+            outbound, scope, representation, preprocess_ms = prepare_outbound(
+                method,
+                raw_payload,
+                date,
+                privacy_agent,
+                fixed_aliases,
+                args.disclosure_level,
+            )
+            representations[method].append(representation)
+            prompt = build_prompt(outbound)
+            backend_result: BackendResult = backend.generate(prompt)
+            outbound_action = parse_action(backend_result.text)
+            post_started = time.perf_counter()
+            restored, valid, rejection = restore_and_validate(
+                method,
+                outbound_action,
+                scope,
+                privacy_agent,
+                fixed_restore,
+            )
+            # The decision sees prior-close portfolio state plus the current
+            # open. Existing positions receive the current-day return only
+            # after generation, immediately before close execution.
+            mark_to_market(portfolio, prices)
+            executed = False
+            if valid and restored is not None:
+                executed, execution_rejection = execute_action(portfolio, restored)
+                if not executed:
+                    rejection = execution_rejection
+            postprocess_ms = (time.perf_counter() - post_started) * 1000
+            values[method].append(portfolio.value)
+            records.append(
+                DayRecord(
+                    method=method,
+                    date=datetime.strptime(str(date), "%Y%m%d").strftime("%Y-%m-%d"),
+                    outbound_prompt_sha256=hashlib.sha256(prompt.encode()).hexdigest(),
+                    direct_identifier_leak=contains_direct_identifier(prompt),
+                    input_tokens=backend_result.input_tokens,
+                    output_tokens=backend_result.output_tokens,
+                    model_latency_ms=backend_result.latency_ms,
+                    preprocess_ms=preprocess_ms,
+                    postprocess_ms=postprocess_ms,
+                    parsed=outbound_action is not None,
+                    valid=valid,
+                    executed=executed,
+                    rejection_reason=rejection,
+                    raw_output=backend_result.text,
+                    outbound_action=outbound_action,
+                    restored_action=restored,
+                    portfolio_value=portfolio.value,
+                    cash=portfolio.cash,
+                    portfolio_weights={
+                        asset: (
+                            portfolio.holdings[asset] / portfolio.value
+                            if portfolio.value > 0
+                            else 0.0
+                        )
+                        for asset in FUND_POOL
+                    },
+                )
+            )
+            if scope is not None:
+                privacy_agent.close_scope(scope)
+            print(
+                f"[{day_index:02d}/{len(dates):02d}] {date} {method}: "
+                f"valid={valid} executed={executed} value={portfolio.value:.2f}",
+                flush=True,
+            )
+        write_checkpoint(
+            checkpoint_path(args),
+            fingerprint,
+            day_index,
+            portfolios,
+            values,
+            representations,
+            records,
+        )
+
+    table = summarize(
+        args.methods, records, values, portfolios, representations
+    )
+    return {
+        "metadata": {
+            "benchmark": "NLPCC 2026 Shared Task 4 Track 1 public A-set",
+            "prompt_version": PROMPT_VERSION,
+            "model": args.model,
+            "model_revision": MODEL_REVISION,
+            "finscope_commit": FINSCOPE_COMMIT,
+            "finscope_disclosure_level": args.disclosure_level,
+            "finscope_disclosure_planner": "deterministic-security-master",
+            "backend": backend.metadata,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "start_date": datetime.strptime(str(dates[0]), "%Y%m%d").strftime("%Y-%m-%d"),
+            "end_date": datetime.strptime(str(dates[-1]), "%Y%m%d").strftime("%Y-%m-%d"),
+            "trading_days": len(dates),
+            "methods": list(args.methods),
+            "fund_pool": list(FUND_POOL),
+            "news_sources": list(NEWS_SOURCES),
+            "official_rank_threshold": args.top_rank,
+            "merged_news_cap": args.top_rank,
+            "news_selection": "official merged stream, title-deduplicated, first Top-20",
+            "news_trading_day_lookback": args.pre_k_days,
+            "price_lookback_days": args.lookback_days,
+            "commission_rate": 0.0001,
+            "initial_capital": 100_000.0,
+            "temperature": 0,
+            "do_sample": False,
+            "files": files,
+            "limitations": [
+                (
+                    "requested date window may be shorter than the full 2025 A-set"
+                    if len(dates) < 243
+                    else "single full-year 2025 A-set replay"
+                ),
+                "direct literal identifier leakage only; no semantic attacker model",
+                "one deterministic generation per method and day",
+                "LLM Rewrite is excluded because no rewrite-model call is configured",
+            ],
+        },
+        "main_table": table,
+        "daily_records": [asdict(record) for record in records],
+        "portfolio_value_history": values,
+    }
+
+
+def main() -> None:
+    args = parse_args()
+    result = run(args)
+    output = Path(args.output)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+    markdown = output.with_suffix(".md")
+    markdown.write_text(render_markdown(result), encoding="utf-8")
+    print(f"wrote {output}")
+    print(f"wrote {markdown}")
+
+
+if __name__ == "__main__":
+    main()

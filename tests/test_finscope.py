@@ -111,6 +111,24 @@ class FinScopeTests(unittest.TestCase):
             {"holdings": {"贵州茅台": 0.4}},
         )
 
+    def test_numeric_cjk_name_is_sanitized_before_financial_suffix(self) -> None:
+        mediator = FinScopeMediator(
+            [
+                {"name": "沪深300", "aliases": ["000300"]},
+                {"name": "黄金", "aliases": ["GOLD"]},
+            ]
+        )
+        scope = mediator.open_scope("cn-financial-suffix", "2026-08-14")
+
+        sanitized = mediator.sanitize_prompt(
+            "汇金增持沪深300ETF，并关注黄金ETF基金", scope
+        )
+
+        self.assertNotIn("沪深300", sanitized)
+        self.assertNotIn("黄金", sanitized)
+        self.assertEqual(sanitized.count("FS_ASSET_"), 2)
+        self.assertIn("ETF", sanitized)
+
     def test_task_scope_context_erases_mapping(self) -> None:
         mediator = FinScopeMediator(["AAPL"])
         with mediator.task_scope("context-task", "2026-08-14") as scope:

@@ -69,9 +69,9 @@ FinScope 解决一个很具体的问题：金融 Agent 需要把新闻、行情�
 - 交易动作恢复与资产、方向、数量、价格、权重合法性校验；
 - NLPCC、StockBench、FinVault 共用的 Agent 生命周期适配接口；
 - 本地 Qwen3.8-27B、企业 DeepSeek V4 Flash、GLM-5.1 的 OpenAI-compatible 配置；
-- 33 项离线测试，不需要模型服务器和 API 即可运行。
+- 38 项离线测试，不需要模型服务器和 API 即可运行。
 
-目前**没有**在本仓库中声称已完成三套 benchmark 的正式回测结果。`BenchmarkPrivacyAdapter` 已统一隐私参数和生命周期；仍需在实验服务器下载每个上游仓库，把它的 LLM、工具和最终 action 钩子接到该适配器，然后运行下文实验矩阵。
+目前已完成 `NLPCC 2026 Track 1 public A-set × Qwen3.8-27B` 的 2025 全年重放，公开的聚合结果见 [`benchmarks/results/nlpcc_real_2025_qwen38_p3.md`](benchmarks/results/nlpcc_real_2025_qwen38_p3.md)。这不是官方榜单提交；三基座、三 benchmark 的完整矩阵以及主动隐私攻击仍待运行。逐日匿名输出、本地恢复 action 和映射 ground truth 不提交，只保留在实验服务器。
 
 ## 4. 五分钟运行离线演示
 
@@ -393,6 +393,7 @@ docs/                     背景、快速入门和服务器交接提示词
 
 - [完整项目背景](docs/project_background.md)
 - [基础实现说明](docs/finscope_quickstart.md)
+- [COLING 故事、实验清单与表格](docs/coling_story_experiment_tables.md)
 - [服务器交接启动提示词](docs/agent_handoff_prompt.md)
 
 ## 12. 安全与复现底线

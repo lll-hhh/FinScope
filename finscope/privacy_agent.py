@@ -212,8 +212,21 @@ class DeterministicDisclosurePlanner:
                 values = ["金融标的"]
             elif values == [profile.asset_type] and level == DisclosureLevel.P5:
                 values = [profile.asset_type or "金融标的"]
+            descriptor = "".join(values)
+            forbidden = tuple(
+                item.casefold() for item in profile.identifiers() if item
+            )
+            if any(item in descriptor.casefold() for item in forbidden):
+                if len(values) > 1:
+                    descriptor = values[0] + "类" + "".join(values[1:])
+                if any(item in descriptor.casefold() for item in forbidden):
+                    descriptor = profile.asset_type or "金融标的"
+                    used = ["asset_type"] if profile.asset_type else []
+                if any(item in descriptor.casefold() for item in forbidden):
+                    descriptor = "金融标的"
+                    used = []
             candidates.append(
-                DisclosureCandidate(level, "".join(values), tuple(used), "deterministic")
+                DisclosureCandidate(level, descriptor, tuple(used), "deterministic")
             )
         return DisclosurePlan(profile.canonical_id, tuple(candidates))
 
@@ -548,7 +561,7 @@ class LocalPrivacyAgent:
         for binding in state.bindings:
             binding_by_alias.setdefault(binding.alias, []).append(binding)
 
-        def unwrap(text: str) -> str:
+        def unwrap(text: str, *, require_handle: bool) -> str:
             wrapper_spans: List[Tuple[int, int]] = []
             pieces: List[str] = []
             cursor = 0
@@ -582,6 +595,8 @@ class LocalPrivacyAgent:
                 descriptors.setdefault(binding.descriptor, set()).add(binding.alias)
             for descriptor, aliases in descriptors.items():
                 if descriptor and descriptor in outside_text:
+                    if execution and not require_handle:
+                        continue
                     severity = "error" if execution or len(aliases) > 1 else "warning"
                     issues.append(
                         AuditIssue(
@@ -593,7 +608,25 @@ class LocalPrivacyAgent:
                     )
             return "".join(pieces)
 
-        unwrapped = self._transform_strings(output, unwrap)
+        def unwrap_value(value: JsonValue, key_hint: str = "") -> JsonValue:
+            if isinstance(value, str):
+                require_handle = execution and (
+                    not key_hint
+                    or key_hint.casefold() in self.mediator.ASSET_FIELD_NAMES
+                )
+                return unwrap(value, require_handle=require_handle)
+            if isinstance(value, Mapping):
+                return {
+                    key: unwrap_value(item, str(key))
+                    for key, item in value.items()
+                }
+            if isinstance(value, Sequence) and not isinstance(
+                value, (str, bytes, bytearray)
+            ):
+                return [unwrap_value(item, key_hint) for item in value]
+            return value
+
+        unwrapped = unwrap_value(output)
         for alias in self._find_aliases(unwrapped):
             if alias not in known_aliases:
                 issues.append(

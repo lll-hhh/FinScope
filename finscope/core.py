@@ -966,13 +966,14 @@ class FinScopeMediator:
         """Build ASCII boundaries without blocking CJK-adjacent names."""
 
         escaped = re.escape(entity)
+        financial_suffix = r"(?:ETF|LOF|基金|指数)"
         left = (
             r"(?<![A-Za-z0-9_])"
             if entity and entity[0].isascii() and entity[0].isalnum()
             else ""
         )
         right = (
-            r"(?![A-Za-z0-9_])"
+            r"(?:(?![A-Za-z0-9_])|(?=" + financial_suffix + r"))"
             if entity and entity[-1].isascii() and entity[-1].isalnum()
             else ""
         )

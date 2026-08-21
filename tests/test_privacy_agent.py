@@ -61,6 +61,21 @@ class PrivacyAgentTests(unittest.TestCase):
             self.assertNotIn("贵州茅台", output)
             self.assertNotIn("600519", output)
 
+    def test_deterministic_description_cannot_equal_real_identifier(self) -> None:
+        catalog = [
+            {
+                "canonical_id": "000941.SH",
+                "name": "新能源指数",
+                "asset_type": "指数",
+                "sector_l1": "新能源",
+            }
+        ]
+        agent = LocalPrivacyAgent(catalog)
+        scope = agent.open_scope("descriptor-collision", "2026-08-21")
+        safe = agent.sanitize("新能源指数", scope, disclosure_level="P3")
+        self.assertNotIn(">新能源指数</fin-ref>", safe)
+        self.assertIn(">新能源类指数</fin-ref>", safe)
+
     def test_same_semantics_keep_distinct_handles_and_restore_exactly(self) -> None:
         safe = self.agent.sanitize(
             ["贵州茅台", "五粮液"], self.scope, disclosure_level="P2"
@@ -82,6 +97,22 @@ class PrivacyAgentTests(unittest.TestCase):
                 self.scope,
                 execution=True,
             )
+
+    def test_descriptor_in_reason_does_not_block_handle_bound_action(self) -> None:
+        safe_asset = self.agent.sanitize(
+            "贵州茅台", self.scope, disclosure_level="P2"
+        )
+        result = self.agent.validate_action(
+            {
+                "asset": safe_asset,
+                "side": "buy",
+                "quantity": 1,
+                "reason": "白酒股票基本面稳健",
+            },
+            self.scope,
+        )
+        self.assertEqual(result.action["asset"], "贵州茅台")
+        self.assertEqual(result.action["reason"], "白酒股票基本面稳健")
 
     def test_stale_handle_is_rejected(self) -> None:
         stale = '<fin-ref type="asset" id="FS_ASSET_ABCDEFGH">股票</fin-ref>'

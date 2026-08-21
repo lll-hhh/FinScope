@@ -1,0 +1,419 @@
+{
+  "schema_version": "finscope-public-summary-v1",
+  "trace_policy": "Aggregate metrics only; daily prompts, outputs, restored actions, and mappings remain local.",
+  "metadata": {
+    "benchmark": "NLPCC 2026 Shared Task 4 Track 1 public A-set",
+    "prompt_version": "nlpcc-track1-single-action-v1",
+    "base_model": "Qwen3.8-27B",
+    "model_revision": "1098534ab5d7220ea0f4a6b9f07bb03729a79c1d",
+    "finscope_commit": "0e68fbd209c7db337e7b8b31cba169bbb410a3c9",
+    "finscope_disclosure_level": "P3",
+    "finscope_disclosure_planner": "deterministic-security-master",
+    "backend_kind": "transformers",
+    "backend_dtype": "torch.bfloat16",
+    "start_date": "2025-01-02",
+    "end_date": "2025-12-31",
+    "trading_days": 243,
+    "methods": [
+      "vanilla",
+      "deletion",
+      "fixed_alias",
+      "finscope"
+    ],
+    "fund_pool": [
+      "000300.SH",
+      "000905.SH",
+      "399006.SZ",
+      "000688.SH",
+      "000932.SH",
+      "000941.SH",
+      "399971.SZ",
+      "000819.SH",
+      "000928.SH",
+      "000012.SH",
+      "518880.SH"
+    ],
+    "news_sources": [
+      "caixin",
+      "tiantian",
+      "sinafinance",
+      "tencent"
+    ],
+    "official_rank_threshold": 20,
+    "merged_news_cap": 20,
+    "news_selection": "official merged stream, title-deduplicated, first Top-20",
+    "news_trading_day_lookback": 1,
+    "price_lookback_days": 6,
+    "commission_rate": 0.0001,
+    "initial_capital": 100000.0,
+    "temperature": 0,
+    "do_sample": false,
+    "execution_mode": "method-sharded across GPUs 4, 5, and 6",
+    "limitations": [
+      "single full-year 2025 A-set replay",
+      "direct literal identifier leakage only; no semantic attacker model",
+      "one deterministic generation per method and day",
+      "LLM Rewrite is excluded because no rewrite-model call is configured"
+    ]
+  },
+  "main_table": [
+    {
+      "method": "vanilla",
+      "total_return": 0.3945333136211566,
+      "sharpe": 2.4264781689706125,
+      "sortino": 3.5823176494921483,
+      "max_drawdown": 0.06880143865056809,
+      "turnover_over_initial_capital": 13.037995796177874,
+      "final_portfolio_value": 139453.33136211566,
+      "valid_action_rate": 0.9917695473251029,
+      "execution_success_rate": 0.9876543209876543,
+      "decision_agreement_with_vanilla": 0.9917695473251029,
+      "portfolio_weight_mae_vs_vanilla": 0.0,
+      "direct_identifier_leak_rate": 1.0,
+      "cross_day_unique_link_rate": 1.0,
+      "avg_input_tokens": 4602.609053497942,
+      "avg_output_tokens": 79.49382716049382,
+      "local_p95_ms": 0.05135685205459595,
+      "e2e_p95_ms": 8215.845386963338
+    },
+    {
+      "method": "deletion",
+      "total_return": 0.0,
+      "sharpe": 0.0,
+      "sortino": 0.0,
+      "max_drawdown": 0.0,
+      "turnover_over_initial_capital": 0.0,
+      "final_portfolio_value": 100000.0,
+      "valid_action_rate": 0.0,
+      "execution_success_rate": 0.0,
+      "decision_agreement_with_vanilla": 0.0,
+      "portfolio_weight_mae_vs_vanilla": 0.08653428811259266,
+      "direct_identifier_leak_rate": 0.0,
+      "cross_day_unique_link_rate": 0.0,
+      "avg_input_tokens": 4447.263374485597,
+      "avg_output_tokens": 69.49382716049382,
+      "local_p95_ms": 12.237295974045992,
+      "e2e_p95_ms": 7750.950599554926
+    },
+    {
+      "method": "fixed_alias",
+      "total_return": 0.2528226806545948,
+      "sharpe": 2.2636185186677356,
+      "sortino": 3.4599347839519217,
+      "max_drawdown": 0.04425301872843734,
+      "turnover_over_initial_capital": 16.62315848065438,
+      "final_portfolio_value": 125282.26806545949,
+      "valid_action_rate": 0.9753086419753086,
+      "execution_success_rate": 0.9753086419753086,
+      "decision_agreement_with_vanilla": 0.3333333333333333,
+      "portfolio_weight_mae_vs_vanilla": 0.12439845514113362,
+      "direct_identifier_leak_rate": 0.0,
+      "cross_day_unique_link_rate": 1.0,
+      "avg_input_tokens": 4606.9465020576135,
+      "avg_output_tokens": 72.63374485596708,
+      "local_p95_ms": 12.70101498812437,
+      "e2e_p95_ms": 8179.97384397313
+    },
+    {
+      "method": "finscope",
+      "total_return": 0.33595164380176024,
+      "sharpe": 2.3701858979351593,
+      "sortino": 3.5289749640676855,
+      "max_drawdown": 0.07635626219900105,
+      "turnover_over_initial_capital": 20.447723552918195,
+      "final_portfolio_value": 133595.16438017602,
+      "valid_action_rate": 0.9629629629629629,
+      "execution_success_rate": 0.9588477366255144,
+      "decision_agreement_with_vanilla": 0.27983539094650206,
+      "portfolio_weight_mae_vs_vanilla": 0.0943658505440804,
+      "direct_identifier_leak_rate": 0.0,
+      "cross_day_unique_link_rate": 0.0,
+      "avg_input_tokens": 5141.481481481482,
+      "avg_output_tokens": 95.32921810699588,
+      "local_p95_ms": 12.878132052719593,
+      "e2e_p95_ms": 9222.836146131158
+    }
+  ],
+  "expanded_metrics": {
+    "by_method": {
+      "vanilla": {
+        "finance": {
+          "annualized_return": 0.4118160400846793,
+          "annualized_volatility": 0.14666053436701748,
+          "calmar_ratio": 5.9855730950079336,
+          "average_daily_return": 0.0014121769241711593,
+          "positive_day_rate": 0.5637860082304527,
+          "negative_day_rate": 0.43621399176954734,
+          "best_daily_return": 0.025487348111614905,
+          "worst_daily_return": -0.05258417871415422,
+          "historical_var_95": 0.01279087816722646,
+          "historical_cvar_95": 0.02135332247570634,
+          "max_drawdown_duration_days": 59,
+          "executed_trade_count": 226,
+          "final_cash": 9451.73852243274
+        },
+        "continuity": {
+          "parsed_count": 241,
+          "parse_success_rate": 0.9917695473251029,
+          "valid_count": 241,
+          "valid_given_parsed_rate": 1.0,
+          "executed_count": 240,
+          "execution_given_valid_rate": 0.995850622406639,
+          "workflow_interruption_rate": 0.012345679012345734,
+          "common_valid_days": 241,
+          "asset_agreement_given_common_valid": 1,
+          "action_agreement_given_common_valid": 1,
+          "action_counts": {
+            "buy": 81,
+            "hold": 14,
+            "sell": 146
+          },
+          "rejection_counts": {
+            "cannot sell an empty holding": 1,
+            "model output is not parseable JSON": 2
+          },
+          "malformed_output_count": 2,
+          "restoration_audit_rejection_count": 0,
+          "execution_rejection_count": 1
+        },
+        "privacy": {
+          "direct_identifier_leak_count": 243,
+          "direct_identifier_leak_rate": 1.0,
+          "cross_day_unique_link_rate": 1.0
+        },
+        "cost": {
+          "total_input_tokens": 1118434,
+          "total_output_tokens": 19317,
+          "average_input_tokens": 4602.609053497942,
+          "p95_input_tokens": 4678,
+          "average_output_tokens": 79.49382716049382,
+          "p95_output_tokens": 103,
+          "average_model_latency_ms": 6914.103505354942,
+          "p95_model_latency_ms": 8215.822246856987,
+          "average_preprocess_ms": 0.002988483833432688,
+          "p95_preprocess_ms": 0.004654284566640854,
+          "average_postprocess_ms": 0.028053913725379073,
+          "p95_postprocess_ms": 0.04846183583140373,
+          "average_local_overhead_ms": 0.03104239755881176,
+          "p95_local_overhead_ms": 0.05135685205459595,
+          "average_e2e_latency_ms": 6914.134547752501,
+          "p50_e2e_latency_ms": 6911.693693138659,
+          "p95_e2e_latency_ms": 8215.845386963338,
+          "total_model_time_hours": 0.46670198661145856,
+          "aggregate_output_tokens_per_second": 11.49734410237368,
+          "input_token_overhead_vs_vanilla": 0.0
+        }
+      },
+      "deletion": {
+        "finance": {
+          "annualized_return": 0.0,
+          "annualized_volatility": 0.0,
+          "calmar_ratio": 0.0,
+          "average_daily_return": 0.0,
+          "positive_day_rate": 0.0,
+          "negative_day_rate": 0.0,
+          "best_daily_return": 0.0,
+          "worst_daily_return": 0.0,
+          "historical_var_95": 0.0,
+          "historical_cvar_95": 0.0,
+          "max_drawdown_duration_days": 0,
+          "executed_trade_count": 0,
+          "final_cash": 100000.0
+        },
+        "continuity": {
+          "parsed_count": 243,
+          "parse_success_rate": 1.0,
+          "valid_count": 0,
+          "valid_given_parsed_rate": 0.0,
+          "executed_count": 0,
+          "execution_given_valid_rate": 0.0,
+          "workflow_interruption_rate": 1.0,
+          "common_valid_days": 0,
+          "asset_agreement_given_common_valid": 0.0,
+          "action_agreement_given_common_valid": 0.0,
+          "action_counts": {},
+          "rejection_counts": {
+            "deleted identifier cannot be restored": 243
+          },
+          "malformed_output_count": 0,
+          "restoration_audit_rejection_count": 0,
+          "execution_rejection_count": 0
+        },
+        "privacy": {
+          "direct_identifier_leak_count": 0,
+          "direct_identifier_leak_rate": 0.0,
+          "cross_day_unique_link_rate": 0.0
+        },
+        "cost": {
+          "total_input_tokens": 1080685,
+          "total_output_tokens": 16887,
+          "average_input_tokens": 4447.263374485597,
+          "p95_input_tokens": 4496,
+          "average_output_tokens": 69.49382716049382,
+          "p95_output_tokens": 94,
+          "average_model_latency_ms": 6371.490780557333,
+          "p95_model_latency_ms": 7738.839233759791,
+          "average_preprocess_ms": 11.874269556116175,
+          "p95_preprocess_ms": 12.208945117890835,
+          "average_postprocess_ms": 0.013848291441736889,
+          "p95_postprocess_ms": 0.03327615559101105,
+          "average_local_overhead_ms": 11.888117847557911,
+          "p95_local_overhead_ms": 12.237295974045992,
+          "average_e2e_latency_ms": 6383.3788984048915,
+          "p50_e2e_latency_ms": 6236.189197283238,
+          "p95_e2e_latency_ms": 7750.950599554926,
+          "total_model_time_hours": 0.43007562768762,
+          "aggregate_output_tokens_per_second": 10.906996424220674,
+          "input_token_overhead_vs_vanilla": -0.033751656333766644
+        }
+      },
+      "fixed_alias": {
+        "finance": {
+          "annualized_return": 0.26332516755713575,
+          "annualized_volatility": 0.10577347795606946,
+          "calmar_ratio": 5.950445305732802,
+          "average_daily_return": 0.0009501222360525885,
+          "positive_day_rate": 0.5555555555555556,
+          "negative_day_rate": 0.4444444444444444,
+          "best_daily_return": 0.022802382617196804,
+          "worst_daily_return": -0.03070511980147106,
+          "historical_var_95": 0.008608513450002353,
+          "historical_cvar_95": 0.0153376321198911,
+          "max_drawdown_duration_days": 53,
+          "executed_trade_count": 201,
+          "final_cash": 18852.604583620647
+        },
+        "continuity": {
+          "parsed_count": 240,
+          "parse_success_rate": 0.9876543209876543,
+          "valid_count": 237,
+          "valid_given_parsed_rate": 0.9875,
+          "executed_count": 237,
+          "execution_given_valid_rate": 1.0,
+          "workflow_interruption_rate": 0.024691358024691357,
+          "common_valid_days": 235,
+          "asset_agreement_given_common_valid": 0.4340425531914894,
+          "action_agreement_given_common_valid": 0.574468085106383,
+          "action_counts": {
+            "buy": 74,
+            "hold": 36,
+            "sell": 127
+          },
+          "rejection_counts": {
+            "buy amount must be positive": 3,
+            "model output is not parseable JSON": 3
+          },
+          "malformed_output_count": 3,
+          "restoration_audit_rejection_count": 0,
+          "execution_rejection_count": 0
+        },
+        "privacy": {
+          "direct_identifier_leak_count": 0,
+          "direct_identifier_leak_rate": 0.0,
+          "cross_day_unique_link_rate": 1.0
+        },
+        "cost": {
+          "total_input_tokens": 1119488,
+          "total_output_tokens": 17650,
+          "average_input_tokens": 4606.9465020576135,
+          "p95_input_tokens": 4688,
+          "average_output_tokens": 72.63374485596708,
+          "p95_output_tokens": 102,
+          "average_model_latency_ms": 6549.735493425264,
+          "p95_model_latency_ms": 8167.710294015706,
+          "average_preprocess_ms": 12.192975499747712,
+          "p95_preprocess_ms": 12.670083902776241,
+          "average_postprocess_ms": 0.023395591511279956,
+          "p95_postprocess_ms": 0.035886187106370926,
+          "average_local_overhead_ms": 12.216371091258992,
+          "p95_local_overhead_ms": 12.70101498812437,
+          "average_e2e_latency_ms": 6561.9518645165235,
+          "p50_e2e_latency_ms": 6651.090499013662,
+          "p95_e2e_latency_ms": 8179.97384397313,
+          "total_model_time_hours": 0.44210714580620536,
+          "aggregate_output_tokens_per_second": 11.089569178614626,
+          "input_token_overhead_vs_vanilla": 0.0009423890904605159
+        }
+      },
+      "finscope": {
+        "finance": {
+          "annualized_return": 0.3503602798384895,
+          "annualized_volatility": 0.13038133046379907,
+          "calmar_ratio": 4.5884943781739125,
+          "average_daily_return": 0.0012263015508703185,
+          "positive_day_rate": 0.5843621399176955,
+          "negative_day_rate": 0.411522633744856,
+          "best_daily_return": 0.038213479522734684,
+          "worst_daily_return": -0.03873640318490401,
+          "historical_var_95": 0.012479878859873006,
+          "historical_cvar_95": 0.019366236094098592,
+          "max_drawdown_duration_days": 59,
+          "executed_trade_count": 209,
+          "final_cash": 21126.488058290324
+        },
+        "continuity": {
+          "parsed_count": 237,
+          "parse_success_rate": 0.9753086419753086,
+          "valid_count": 234,
+          "valid_given_parsed_rate": 0.9873417721518988,
+          "executed_count": 233,
+          "execution_given_valid_rate": 0.9957264957264957,
+          "workflow_interruption_rate": 0.04115226337448563,
+          "common_valid_days": 232,
+          "asset_agreement_given_common_valid": 0.35344827586206895,
+          "action_agreement_given_common_valid": 0.5775862068965517,
+          "action_counts": {
+            "buy": 57,
+            "hold": 24,
+            "sell": 153
+          },
+          "rejection_counts": {
+            "cannot sell an empty holding": 1,
+            "model output is not parseable JSON": 6,
+            "restoration audit failed: direct_identity_output": 3
+          },
+          "malformed_output_count": 6,
+          "restoration_audit_rejection_count": 3,
+          "execution_rejection_count": 1
+        },
+        "privacy": {
+          "direct_identifier_leak_count": 0,
+          "direct_identifier_leak_rate": 0.0,
+          "cross_day_unique_link_rate": 0.0
+        },
+        "cost": {
+          "total_input_tokens": 1249380,
+          "total_output_tokens": 23165,
+          "average_input_tokens": 5141.481481481482,
+          "p95_input_tokens": 5263,
+          "average_output_tokens": 95.32921810699588,
+          "p95_output_tokens": 119,
+          "average_model_latency_ms": 8004.639337523438,
+          "p95_model_latency_ms": 9210.05822904408,
+          "average_preprocess_ms": 11.890652664235713,
+          "p95_preprocess_ms": 12.605571188032627,
+          "average_postprocess_ms": 0.2722368429993651,
+          "p95_postprocess_ms": 0.4223799332976341,
+          "average_local_overhead_ms": 12.162889507235077,
+          "p95_local_overhead_ms": 12.878132052719593,
+          "average_e2e_latency_ms": 8016.802227030673,
+          "p50_e2e_latency_ms": 8056.936139706522,
+          "p95_e2e_latency_ms": 9222.836146131158,
+          "total_model_time_hours": 0.5403131552828321,
+          "aggregate_output_tokens_per_second": 11.909245886959583,
+          "input_token_overhead_vs_vanilla": 0.11707977404120418
+        }
+      }
+    },
+    "not_measured": [
+      "Asset-ReID@1/@5",
+      "Pool-Recovery F1",
+      "Holding-Inference F1",
+      "Weight-Inference MAE from an attacker",
+      "Cross-Day-Link AUC from an attacker",
+      "Action/Intent Inference",
+      "Unsafe Repair Rate",
+      "monetary API cost, GPU energy, and peak GPU memory"
+    ]
+  }
+}
