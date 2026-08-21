@@ -9,6 +9,7 @@ from benchmarks.run_nlpcc_real import (
     FUND_POOL,
     LocalPrivacyAgent,
     asset_catalog,
+    apply_cached_rewrite,
     build_episode_aliases,
     coarsen_market_features,
     prepare_outbound,
@@ -129,6 +130,27 @@ class RealNlpccRunnerTests(unittest.TestCase):
             [item["title"] for item in rewritten["news"]],
             ["贵金属避险需求上升", "科技行业承压"],
         )
+
+    def test_cached_rewrite_validates_source_and_restores_usage(self) -> None:
+        outbound = {"news": [{"source": "a", "title": "黄金ETF上涨"}]}
+        from benchmarks.run_nlpcc_real import news_titles_sha256
+
+        cache = {
+            "20250102": {
+                "source_titles_sha256": news_titles_sha256(outbound),
+                "safe_titles": ["贵金属避险需求上升"],
+                "succeeded": True,
+                "usage": {"input_tokens": 101, "output_tokens": 22, "latency_ms": 12.5},
+            }
+        }
+        rewritten, usage, succeeded = apply_cached_rewrite(outbound, 20250102, cache)
+        self.assertTrue(succeeded)
+        self.assertEqual(rewritten["news"][0]["title"], "贵金属避险需求上升")
+        self.assertEqual((usage.input_tokens, usage.output_tokens), (101, 22))
+        with self.assertRaisesRegex(RuntimeError, "source mismatch"):
+            apply_cached_rewrite(
+                {"news": [{"source": "a", "title": "不同标题"}]}, 20250102, cache
+            )
 
     def test_market_features_remove_exact_price_fingerprints(self) -> None:
         raw = payload()

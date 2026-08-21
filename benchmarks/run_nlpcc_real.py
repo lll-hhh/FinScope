@@ -188,6 +188,12 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--methods", nargs="+", choices=METHODS, default=list(METHODS))
     parser.add_argument(
+        "--rewrite-cache",
+        nargs="*",
+        default=[],
+        help="validated rewrite-cache shards used by the llm_rewrite method",
+    )
+    parser.add_argument(
         "--output",
         default="benchmarks/results/nlpcc_real_2025_qwen38_p3.json",
     )
@@ -512,6 +518,54 @@ def rewrite_news(
         for item, safe_title in zip(outbound.get("news", []), safe_titles)
     ]
     return outbound, result, succeeded
+
+
+def news_titles_sha256(payload: Mapping[str, Any]) -> str:
+    titles = [str(item.get("title", "")) for item in payload.get("news", [])]
+    encoded = json.dumps(titles, ensure_ascii=False, separators=(",", ":")).encode()
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def load_rewrite_cache(paths: Sequence[str]) -> Dict[str, Mapping[str, Any]]:
+    cache: Dict[str, Mapping[str, Any]] = {}
+    for value in paths:
+        path = Path(value)
+        document = json.loads(path.read_text(encoding="utf-8"))
+        for date, entry in document.get("entries", {}).items():
+            if date in cache:
+                raise RuntimeError(f"duplicate rewrite-cache date: {date}")
+            cache[str(date)] = entry
+    return cache
+
+
+def apply_cached_rewrite(
+    payload: Dict[str, Any], date: int, cache: Mapping[str, Mapping[str, Any]]
+) -> Tuple[Dict[str, Any], BackendResult, bool]:
+    key = str(date)
+    if key not in cache:
+        raise RuntimeError(f"rewrite cache lacks trading day: {key}")
+    entry = cache[key]
+    source_hash = news_titles_sha256(payload)
+    if entry.get("source_titles_sha256") != source_hash:
+        raise RuntimeError(f"rewrite-cache source mismatch on {key}")
+    safe_titles = entry.get("safe_titles")
+    if not isinstance(safe_titles, list) or len(safe_titles) != len(payload.get("news", [])):
+        raise RuntimeError(f"rewrite-cache title count mismatch on {key}")
+    payload["news"] = [
+        {**item, "title": str(title)}
+        for item, title in zip(payload.get("news", []), safe_titles)
+    ]
+    usage = entry.get("usage", {})
+    return (
+        payload,
+        BackendResult(
+            "",
+            int(usage.get("input_tokens", 0)),
+            int(usage.get("output_tokens", 0)),
+            float(usage.get("latency_ms", 0.0)),
+        ),
+        bool(entry.get("succeeded")),
+    )
 
 
 def prepare_outbound(
@@ -1035,6 +1089,10 @@ def run_fingerprint(args: argparse.Namespace, dates: Sequence[int]) -> str:
         "top_rank": args.top_rank,
         "pre_k_days": args.pre_k_days,
         "max_new_tokens": args.max_new_tokens,
+        "rewrite_cache": [
+            hashlib.sha256(Path(path).read_bytes()).hexdigest()
+            for path in args.rewrite_cache
+        ],
     }
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
     return hashlib.sha256(encoded).hexdigest()
@@ -1105,6 +1163,7 @@ def run(args: argparse.Namespace) -> Dict[str, Any]:
         asset: f"FIXED_ASSET_{index:03d}"
         for index, asset in enumerate(FUND_POOL, start=1)
     }
+    rewrite_cache = load_rewrite_cache(args.rewrite_cache)
     if saved is None:
         completed_days = 0
         portfolios = {method: Portfolio() for method in args.methods}
@@ -1125,6 +1184,17 @@ def run(args: argparse.Namespace) -> Dict[str, Any]:
         for method in args.methods:
             portfolio = portfolios[method]
             raw_payload = build_payload(loader, date, portfolio, args)
+            rewrite_result = BackendResult("", 0, 0, 0.0)
+            rewrite_succeeded = None
+            if method == "llm_rewrite":
+                if rewrite_cache:
+                    raw_payload, rewrite_result, rewrite_succeeded = apply_cached_rewrite(
+                        raw_payload, date, rewrite_cache
+                    )
+                else:
+                    raw_payload, rewrite_result, rewrite_succeeded = rewrite_news(
+                        backend, raw_payload
+                    )
             aliases = (
                 build_episode_aliases(date)
                 if method in {"llm_rewrite", "episode_alias"}
@@ -1140,12 +1210,6 @@ def run(args: argparse.Namespace) -> Dict[str, Any]:
                 args.disclosure_level,
             )
             representations[method].append(representation)
-            rewrite_result = BackendResult("", 0, 0, 0.0)
-            rewrite_succeeded = None
-            if method == "llm_rewrite":
-                outbound, rewrite_result, rewrite_succeeded = rewrite_news(
-                    backend, outbound
-                )
             prompt = build_prompt(outbound)
             backend_result: BackendResult = backend.generate(prompt)
             outbound_action = parse_action(backend_result.text)
@@ -1251,6 +1315,7 @@ def run(args: argparse.Namespace) -> Dict[str, Any]:
             "temperature": 0,
             "do_sample": False,
             "files": files,
+            "rewrite_cache_files": list(args.rewrite_cache),
             "limitations": [
                 (
                     "requested date window may be shorter than the full 2025 A-set"
