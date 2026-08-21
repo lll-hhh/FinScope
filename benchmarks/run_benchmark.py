@@ -103,7 +103,9 @@ class DeterministicBackend:
     name = "deterministic-reference"
     metadata = {"kind": "deterministic-reference"}
 
-    def generate(self, prompt: str) -> BackendResult:
+    def generate(
+        self, prompt: str, *, max_new_tokens: Optional[int] = None
+    ) -> BackendResult:
         started = time.perf_counter()
         payload = _extract_input_payload(prompt)
         signals = payload.get("signals", [])
@@ -149,13 +151,15 @@ class OpenAIBackend:
             "model": model,
         }
 
-    def generate(self, prompt: str) -> BackendResult:
+    def generate(
+        self, prompt: str, *, max_new_tokens: Optional[int] = None
+    ) -> BackendResult:
         body = json.dumps(
             {
                 "model": self.model,
                 "messages": [{"role": "user", "content": prompt}],
                 "temperature": 0,
-                "max_tokens": self.max_new_tokens,
+                "max_tokens": max_new_tokens or self.max_new_tokens,
             }
         ).encode("utf-8")
         headers = {"Content-Type": "application/json"}
@@ -214,7 +218,9 @@ class TransformersBackend:
             "dtype": str(self.model.dtype),
         }
 
-    def generate(self, prompt: str) -> BackendResult:
+    def generate(
+        self, prompt: str, *, max_new_tokens: Optional[int] = None
+    ) -> BackendResult:
         messages = [{"role": "user", "content": prompt}]
         formatted = self.processor.apply_chat_template(
             messages,
@@ -229,7 +235,7 @@ class TransformersBackend:
         with self._torch.inference_mode():
             generated = self.model.generate(
                 **inputs,
-                max_new_tokens=self.max_new_tokens,
+                max_new_tokens=max_new_tokens or self.max_new_tokens,
                 do_sample=False,
                 pad_token_id=self.processor.tokenizer.eos_token_id,
             )

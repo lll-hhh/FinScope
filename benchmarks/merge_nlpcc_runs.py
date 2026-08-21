@@ -137,10 +137,25 @@ def compute_expanded_metrics(
         preprocess = [float(row["preprocess_ms"]) for row in rows]
         postprocess = [float(row["postprocess_ms"]) for row in rows]
         local = [before + after for before, after in zip(preprocess, postprocess)]
-        model = [float(row["model_latency_ms"]) for row in rows]
+        decision_model = [float(row["model_latency_ms"]) for row in rows]
+        rewrite_model = [float(row.get("rewrite_latency_ms", 0.0)) for row in rows]
+        model = [
+            decision_ms + rewrite_ms
+            for decision_ms, rewrite_ms in zip(decision_model, rewrite_model)
+        ]
         e2e = [local_ms + model_ms for local_ms, model_ms in zip(local, model)]
-        input_tokens = [int(row["input_tokens"]) for row in rows]
-        output_tokens = [int(row["output_tokens"]) for row in rows]
+        decision_input_tokens = [int(row["input_tokens"]) for row in rows]
+        rewrite_input_tokens = [int(row.get("rewrite_input_tokens", 0)) for row in rows]
+        input_tokens = [
+            decision + rewrite
+            for decision, rewrite in zip(decision_input_tokens, rewrite_input_tokens)
+        ]
+        decision_output_tokens = [int(row["output_tokens"]) for row in rows]
+        rewrite_output_tokens = [int(row.get("rewrite_output_tokens", 0)) for row in rows]
+        output_tokens = [
+            decision + rewrite
+            for decision, rewrite in zip(decision_output_tokens, rewrite_output_tokens)
+        ]
         total_output_tokens = sum(output_tokens)
         total_model_seconds = sum(model) / 1000
 
@@ -204,12 +219,27 @@ def compute_expanded_metrics(
             "cost": {
                 "total_input_tokens": sum(input_tokens),
                 "total_output_tokens": total_output_tokens,
+                "total_rewrite_input_tokens": sum(rewrite_input_tokens),
+                "total_rewrite_output_tokens": sum(rewrite_output_tokens),
+                "rewrite_success_rate": (
+                    _mean(
+                        [
+                            bool(row["rewrite_succeeded"])
+                            for row in rows
+                            if row.get("rewrite_succeeded") is not None
+                        ]
+                    )
+                    if any(row.get("rewrite_succeeded") is not None for row in rows)
+                    else None
+                ),
                 "average_input_tokens": _mean(input_tokens),
                 "p95_input_tokens": percentile(input_tokens, 0.95),
                 "average_output_tokens": _mean(output_tokens),
                 "p95_output_tokens": percentile(output_tokens, 0.95),
                 "average_model_latency_ms": _mean(model),
                 "p95_model_latency_ms": percentile(model, 0.95),
+                "average_rewrite_latency_ms": _mean(rewrite_model),
+                "p95_rewrite_latency_ms": percentile(rewrite_model, 0.95),
                 "average_preprocess_ms": _mean(preprocess),
                 "p95_preprocess_ms": percentile(preprocess, 0.95),
                 "average_postprocess_ms": _mean(postprocess),

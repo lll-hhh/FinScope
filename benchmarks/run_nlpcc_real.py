@@ -15,7 +15,9 @@ import json
 import math
 from pathlib import Path
 import re
+import shutil
 import statistics
+import subprocess
 import sys
 import time
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
@@ -28,7 +30,14 @@ from finscope import (
 from benchmarks.run_benchmark import BackendResult, TransformersBackend
 
 
-METHODS = ("vanilla", "deletion", "fixed_alias", "finscope")
+METHODS = (
+    "vanilla",
+    "deletion",
+    "llm_rewrite",
+    "fixed_alias",
+    "episode_alias",
+    "finscope",
+)
 FUND_POOL = (
     "000300.SH",
     "000905.SH",
@@ -63,7 +72,39 @@ CANONICAL_ASSET = {
 NEWS_SOURCES = ("caixin", "tiantian", "sinafinance", "tencent")
 MODEL_REVISION = "1098534ab5d7220ea0f4a6b9f07bb03729a79c1d"
 PROMPT_VERSION = "nlpcc-track1-single-action-v1"
-FINSCOPE_COMMIT = "0e68fbd209c7db337e7b8b31cba169bbb410a3c9"
+
+
+def source_provenance() -> Tuple[str, bool]:
+    """Return the checked-out revision and whether tracked files differ from it."""
+
+    git = shutil.which("git")
+    if git is None:
+        local_git = Path.home() / ".local" / "usr" / "bin" / "git"
+        git = str(local_git) if local_git.is_file() else None
+    if git is None:
+        return "unknown", True
+    repository = Path(__file__).resolve().parents[1]
+    try:
+        revision = subprocess.run(
+            [git, "rev-parse", "HEAD"],
+            cwd=repository,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        status = subprocess.run(
+            [git, "status", "--porcelain", "--untracked-files=no"],
+            cwd=repository,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout
+    except (OSError, subprocess.CalledProcessError):
+        return "unknown", True
+    return revision, bool(status.strip())
+
+
+FINSCOPE_COMMIT, FINSCOPE_SOURCE_DIRTY = source_provenance()
 
 
 @dataclass
@@ -100,6 +141,10 @@ class DayRecord:
     portfolio_value: float
     cash: float
     portfolio_weights: Dict[str, float]
+    rewrite_input_tokens: int = 0
+    rewrite_output_tokens: int = 0
+    rewrite_latency_ms: float = 0.0
+    rewrite_succeeded: Optional[bool] = None
 
 
 def parse_args() -> argparse.Namespace:
@@ -270,6 +315,97 @@ def build_payload(
     }
 
 
+def _bucket(value: float, boundaries: Sequence[float], labels: Sequence[str]) -> str:
+    for boundary, label in zip(boundaries, labels):
+        if value < boundary:
+            return label
+    return labels[-1]
+
+
+def coarsen_market_features(
+    payload: Mapping[str, Any], disclosure_level: str
+) -> Dict[str, Any]:
+    """Remove exact public-price fingerprints while retaining coarse signals."""
+
+    level = str(disclosure_level).upper()
+    transformed = dict(payload)
+    candidates = []
+    for candidate in payload.get("candidate_pool", []):
+        item = dict(candidate)
+        observations = list(item.pop("prices", []))
+        returns = [
+            float(row["pct_change"])
+            for row in observations
+            if row.get("pct_change") is not None
+        ]
+        momentum = sum(returns)
+        volatility = statistics.mean(abs(value) for value in returns) if returns else 0.0
+        positive_days = sum(value > 0 for value in returns)
+        current_open = next(
+            (
+                float(row["open"])
+                for row in reversed(observations)
+                if row.get("open") is not None and row.get("close") is None
+            ),
+            None,
+        )
+        previous_close = next(
+            (
+                float(row["close"])
+                for row in reversed(observations)
+                if row.get("close") is not None
+            ),
+            None,
+        )
+        open_gap = (
+            (current_open / previous_close - 1) * 100
+            if current_open is not None and previous_close not in {None, 0}
+            else 0.0
+        )
+        features: Dict[str, Any] = {}
+        if level in {"P1", "P2"}:
+            features["momentum"] = _bucket(
+                momentum,
+                (-3.0, -1.0, 1.0, 3.0),
+                ("strong_down", "down", "flat", "up", "strong_up"),
+            )
+            features["volatility"] = _bucket(
+                volatility,
+                (0.8, 1.8),
+                ("low", "medium", "high"),
+            )
+            gap_boundaries = (-1.5, -0.4, 0.4, 1.5) if level == "P1" else (-0.6, 0.6)
+            gap_labels = (
+                ("large_down", "down", "flat", "up", "large_up")
+                if level == "P1"
+                else ("down", "flat", "up")
+            )
+            features["open_gap"] = _bucket(open_gap, gap_boundaries, gap_labels)
+            if level == "P1":
+                features["positive_days"] = _bucket(
+                    float(positive_days),
+                    (2.0, 4.0),
+                    ("few", "mixed", "many"),
+                )
+        elif level == "P3":
+            features["momentum"] = _bucket(
+                momentum, (-1.0, 1.0), ("down", "flat", "up")
+            )
+            features["volatility"] = _bucket(
+                volatility, (0.8, 1.8), ("low", "medium", "high")
+            )
+        elif level == "P4":
+            features["trend"] = _bucket(
+                momentum, (-1.0, 1.0), ("down", "flat", "up")
+            )
+        elif level != "P5":
+            raise ValueError(f"unknown disclosure level: {disclosure_level}")
+        item["market_features"] = features
+        candidates.append(item)
+    transformed["candidate_pool"] = candidates
+    return transformed
+
+
 def build_prompt(payload: Mapping[str, Any]) -> str:
     return (
         "你是NLPCC 2026 Track 1的日频资产配置智能体。根据真实历史行情、截至"
@@ -305,6 +441,51 @@ def replace_known_assets(value: Any, replacements: Mapping[str, str]) -> Any:
     return value
 
 
+def build_episode_aliases(date: int) -> Dict[str, str]:
+    """Create deterministic per-day aliases for the opaque episode baseline."""
+
+    return {
+        asset: "EP_ASSET_" + hashlib.sha256(
+            f"nlpcc-episode-alias-v1:{date}:{asset}".encode()
+        ).hexdigest()[:10].upper()
+        for asset in FUND_POOL
+    }
+
+
+def rewrite_news(
+    backend: TransformersBackend,
+    outbound: Dict[str, Any],
+) -> Tuple[Dict[str, Any], BackendResult, bool]:
+    """Rewrite all daily headlines in one constrained local-model call."""
+
+    titles = [str(item.get("title", "")) for item in outbound.get("news", [])]
+    prompt = (
+        "你是本地金融隐私改写器。将每条标题改写为不含证券、公司、基金、指数、"
+        "人物或机构专名的简短金融事件摘要，同时保留行业、事件类型、方向和情绪。"
+        "不得输出输入中的代码、专名或匿名代号。每条不超过24个汉字，数量和顺序必须"
+        "与输入一致。只输出严格JSON：{\"news\":[\"摘要1\",\"摘要2\"]}。\n"
+        + json.dumps({"news": titles}, ensure_ascii=False, separators=(",", ":"))
+    )
+    result = backend.generate(prompt, max_new_tokens=384)
+    parsed = parse_action(result.text)
+    rewritten = parsed.get("news") if isinstance(parsed, Mapping) else None
+    succeeded = (
+        isinstance(rewritten, list)
+        and len(rewritten) == len(titles)
+        and all(isinstance(item, str) and 0 < len(item.strip()) <= 48 for item in rewritten)
+    )
+    safe_titles = (
+        [item.strip() for item in rewritten]
+        if succeeded
+        else ["匿名金融事件" for _ in titles]
+    )
+    outbound["news"] = [
+        {**item, "title": safe_title}
+        for item, safe_title in zip(outbound.get("news", []), safe_titles)
+    ]
+    return outbound, result, succeeded
+
+
 def prepare_outbound(
     method: str,
     payload: Dict[str, Any],
@@ -333,7 +514,7 @@ def prepare_outbound(
             for item in outbound["portfolio"]["holdings"]
         ]
         representation = {asset: "REDACTED" for asset in FUND_POOL}
-    elif method == "fixed_alias":
+    elif method in {"llm_rewrite", "fixed_alias", "episode_alias"}:
         replacements = {}
         for asset, alias in fixed_aliases.items():
             replacements[asset] = alias
@@ -347,8 +528,9 @@ def prepare_outbound(
             trading_day,
             conversation_id="qwen38-track1",
         )
+        protected_payload = coarsen_market_features(payload, disclosure_level)
         outbound = privacy_agent.sanitize(
-            payload,
+            protected_payload,
             scope,
             disclosure_level=disclosure_level,
             purpose="portfolio-allocation",
@@ -414,7 +596,7 @@ def restore_and_validate(
                 str(restored.get("asset", "")).casefold(),
                 restored.get("asset"),
             )
-        elif method == "fixed_alias":
+        elif method in {"llm_rewrite", "fixed_alias", "episode_alias"}:
             asset = str(restored.get("asset", ""))
             if asset not in fixed_restore:
                 raise ActionValidationError("unknown fixed alias")
@@ -579,14 +761,30 @@ def summarize(
                 )
                 / len(rows),
                 "cross_day_unique_link_rate": sum(links) / len(links) if links else 0.0,
-                "avg_input_tokens": statistics.mean(row.input_tokens for row in rows),
-                "avg_output_tokens": statistics.mean(row.output_tokens for row in rows),
+                "avg_input_tokens": statistics.mean(
+                    row.input_tokens + row.rewrite_input_tokens for row in rows
+                ),
+                "avg_output_tokens": statistics.mean(
+                    row.output_tokens + row.rewrite_output_tokens for row in rows
+                ),
+                "rewrite_success_rate": (
+                    statistics.mean(
+                        bool(row.rewrite_succeeded)
+                        for row in rows
+                        if row.rewrite_succeeded is not None
+                    )
+                    if any(row.rewrite_succeeded is not None for row in rows)
+                    else None
+                ),
                 "local_p95_ms": percentile(
                     [row.preprocess_ms + row.postprocess_ms for row in rows], 0.95
                 ),
                 "e2e_p95_ms": percentile(
                     [
-                        row.preprocess_ms + row.model_latency_ms + row.postprocess_ms
+                        row.preprocess_ms
+                        + row.rewrite_latency_ms
+                        + row.model_latency_ms
+                        + row.postprocess_ms
                         for row in rows
                     ],
                     0.95,
@@ -790,6 +988,7 @@ def checkpoint_path(args: argparse.Namespace) -> Path:
 def run_fingerprint(args: argparse.Namespace, dates: Sequence[int]) -> str:
     payload = {
         "commit": FINSCOPE_COMMIT,
+        "source_dirty": FINSCOPE_SOURCE_DIRTY,
         "model": str(Path(args.model).resolve()),
         "model_revision": MODEL_REVISION,
         "dates": list(dates),
@@ -869,7 +1068,6 @@ def run(args: argparse.Namespace) -> Dict[str, Any]:
         asset: f"FIXED_ASSET_{index:03d}"
         for index, asset in enumerate(FUND_POOL, start=1)
     }
-    fixed_restore = {alias: asset for asset, alias in fixed_aliases.items()}
     if saved is None:
         completed_days = 0
         portfolios = {method: Portfolio() for method in args.methods}
@@ -890,15 +1088,27 @@ def run(args: argparse.Namespace) -> Dict[str, Any]:
         for method in args.methods:
             portfolio = portfolios[method]
             raw_payload = build_payload(loader, date, portfolio, args)
+            aliases = (
+                build_episode_aliases(date)
+                if method in {"llm_rewrite", "episode_alias"}
+                else fixed_aliases
+            )
+            alias_restore = {alias: asset for asset, alias in aliases.items()}
             outbound, scope, representation, preprocess_ms = prepare_outbound(
                 method,
                 raw_payload,
                 date,
                 privacy_agent,
-                fixed_aliases,
+                aliases,
                 args.disclosure_level,
             )
             representations[method].append(representation)
+            rewrite_result = BackendResult("", 0, 0, 0.0)
+            rewrite_succeeded = None
+            if method == "llm_rewrite":
+                outbound, rewrite_result, rewrite_succeeded = rewrite_news(
+                    backend, outbound
+                )
             prompt = build_prompt(outbound)
             backend_result: BackendResult = backend.generate(prompt)
             outbound_action = parse_action(backend_result.text)
@@ -908,7 +1118,7 @@ def run(args: argparse.Namespace) -> Dict[str, Any]:
                 outbound_action,
                 scope,
                 privacy_agent,
-                fixed_restore,
+                alias_restore,
             )
             # The decision sees prior-close portfolio state plus the current
             # open. Existing positions receive the current-day return only
@@ -949,6 +1159,10 @@ def run(args: argparse.Namespace) -> Dict[str, Any]:
                         )
                         for asset in FUND_POOL
                     },
+                    rewrite_input_tokens=rewrite_result.input_tokens,
+                    rewrite_output_tokens=rewrite_result.output_tokens,
+                    rewrite_latency_ms=rewrite_result.latency_ms,
+                    rewrite_succeeded=rewrite_succeeded,
                 )
             )
             if scope is not None:
@@ -978,8 +1192,10 @@ def run(args: argparse.Namespace) -> Dict[str, Any]:
             "model": args.model,
             "model_revision": MODEL_REVISION,
             "finscope_commit": FINSCOPE_COMMIT,
+            "finscope_source_dirty": FINSCOPE_SOURCE_DIRTY,
             "finscope_disclosure_level": args.disclosure_level,
             "finscope_disclosure_planner": "deterministic-security-master",
+            "finscope_market_disclosure": "coarse-non-invertible-buckets-v1",
             "backend": backend.metadata,
             "generated_at": datetime.now(timezone.utc).isoformat(),
             "start_date": datetime.strptime(str(dates[0]), "%Y%m%d").strftime("%Y-%m-%d"),
@@ -1006,7 +1222,10 @@ def run(args: argparse.Namespace) -> Dict[str, Any]:
                 ),
                 "direct literal identifier leakage only; no semantic attacker model",
                 "one deterministic generation per method and day",
-                "LLM Rewrite is excluded because no rewrite-model call is configured",
+                (
+                    "LLM Rewrite uses the same local base model for one constrained "
+                    "headline-rewrite call before each decision"
+                ),
             ],
         },
         "main_table": table,
