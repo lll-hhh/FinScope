@@ -8,5 +8,10 @@ version = "0.1.0"
 description = "Scope-bound privacy mediation for financial agents"
 requires-python = ">=3.8"
 
+[project.optional-dependencies]
+providers = ["openai>=1.0"]
+local = ["transformers>=4.51", "torch>=2.1"]
+dev = ["pytest>=7"]
+
 [tool.setuptools.packages.find]
 include = ["finscope*"]

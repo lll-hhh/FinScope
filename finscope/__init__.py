@@ -27,6 +27,35 @@ from .policy import (
     ResidualScanDecision,
     ResidualScanPolicy,
 )
+from .privacy_agent import (
+    AmbiguousRestorationError,
+    AssetProfile,
+    AuditIssue,
+    BindingRecord,
+    DeterministicDisclosurePlanner,
+    DisclosureCandidate,
+    DisclosureLevel,
+    DisclosurePlan,
+    EmpiricalDisclosurePolicy,
+    JsonModelDisclosurePlanner,
+    JsonModelRecoveryAuditor,
+    LocalPrivacyAgent,
+    RestorationResult,
+)
+from .benchmarks import (
+    BenchmarkName,
+    BenchmarkPrivacyAdapter,
+    EpisodeContext,
+    PrivacyRunConfig,
+    TraceEvent,
+)
+from .providers import (
+    ModelProfile,
+    OpenAICompatibleChatModel,
+    enterprise_profile,
+    experiment_profiles,
+    local_qwen_profile,
+)
 
 __all__ = [
     "ActionValidationError",
@@ -45,4 +74,27 @@ __all__ = [
     "PrivacyLevel",
     "ResidualScanDecision",
     "ResidualScanPolicy",
+    "AmbiguousRestorationError",
+    "AssetProfile",
+    "AuditIssue",
+    "BindingRecord",
+    "DeterministicDisclosurePlanner",
+    "DisclosureCandidate",
+    "DisclosureLevel",
+    "DisclosurePlan",
+    "EmpiricalDisclosurePolicy",
+    "JsonModelDisclosurePlanner",
+    "JsonModelRecoveryAuditor",
+    "LocalPrivacyAgent",
+    "RestorationResult",
+    "BenchmarkName",
+    "BenchmarkPrivacyAdapter",
+    "EpisodeContext",
+    "PrivacyRunConfig",
+    "TraceEvent",
+    "ModelProfile",
+    "OpenAICompatibleChatModel",
+    "enterprise_profile",
+    "experiment_profiles",
+    "local_qwen_profile",
 ]

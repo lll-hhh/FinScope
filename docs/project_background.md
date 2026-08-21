@@ -1,12 +1,12 @@
 # FinScope 项目背景、B1 方案与实验蓝图
 
-本文是 FinScope B1 方向的完整交接材料，记录项目背景、会议结论、问题定义、当前代码状态、模型分工、数据集接入方式、攻击评测和后续实现边界。文档状态：2026-08-18。它是研究和工程交接文档，不是投资建议。
+本文是 FinScope B1 方向的完整交接材料，记录项目背景、会议结论、问题定义、当前代码状态、模型分工、数据集接入方式、攻击评测和后续实现边界。文档状态：2026-08-21。它是研究和工程交接文档，不是投资建议。
 
 ## 1. 项目摘要
 
 金融 Agent 会把新闻分析、行情摘要、候选资产池、持仓状态和交易意图发送给外部大模型。即使删除部分字段，外部模型仍可能通过公开新闻、价格、连续对话和多个 Agent 的交互记录恢复资产身份、候选池、持仓变化和长期策略；但如果把所有实体都删除，研究、风控、交易 Agent 又无法确认讨论的是同一资产，工具参数和交易执行会失败。
 
-FinScope 是部署在金融 Agent 与外部大模型之间的本地隐私中间层。它的目标是实现“作用域内一致、作用域外不可关联”：研究、风险、交易 Agent 在同一个任务/会话/交易日内共享临时别名；任务完成、新会话或交易日切换后，映射自动清理并重新生成。外部模型只看到别名和经过最小化处理的字段，本地恢复器负责工具查询、交易参数和最终指令的真实身份恢复与合法性校验。
+FinScope 是部署在金融 Agent 与外部大模型之间的本地隐私 Agent。它的目标是实现“作用域内一致、作用域外不可关联”：研究、风险、交易 Agent 在同一个任务/会话/交易日内共享临时别名；任务完成、新会话或交易日切换后，映射自动清理并重新生成。外部模型看到带唯一句柄的 P1-P5 语义描述，本地恢复器负责工具查询、交易参数和最终指令的真实身份恢复与合法性校验。
 
 本项目不提出新的量化策略，研究重点是金融多智能体的运行时隐私、流程连续性、恢复正确性和调用成本。B1 与 A1/A2 的差异在于：B1 关注隐私中间层是否能让一个真实 Agent 在多轮、跨工具、在线执行过程中稳定完成任务，并量化匿名检测、恢复和门控带来的时延与成本。
 
@@ -106,30 +106,33 @@ FinScope 是部署在金融 Agent 与外部大模型之间的本地隐私中间�
 
 ## 4. 当前代码状态
 
-当前仓库是一个无第三方运行时依赖的中间层原型，位于 `finscope/`：
+当前仓库是一个基础运行不依赖第三方库、provider 按需安装的本地隐私 Agent 原型，位于 `finscope/`：
 
 - `finscope/core.py`：scope 生命周期、两阶段 sanitize、映射、恢复、工具/动作校验、指标；
 - `finscope/policy.py`：动态隐私等级和残余扫描门控；
 - `finscope/recognizer.py`：确定性 security-master recognizer、小模型 JSON span recognizer、输出校验和缓存；
+- `finscope/privacy_agent.py`：P1-P5 语义描述规划、事实校验、typed binding、恢复歧义审计；
+- `finscope/providers.py`：本地 Qwen 与企业 OpenAI-compatible 模型配置；
+- `finscope/benchmarks.py`：NLPCC、StockBench、FinVault 共用的生命周期和隐私钩子；
 - `examples/finscope_demo.py`：无模型演示；
 - `examples/finscope_local_model_demo.py`：本地 Transformers 识别器演示；
 - `tests/`：基础替换、作用域轮换、指代、同词异义、恢复和门控测试。
 
-已验证：`python3 -m unittest discover -s tests -v` 通过 21 项测试；已构建 Python wheel；已用本地小模型做过真实 smoke test。当前还没有完成 TradingAgents、FinRobot 或 NLPCC 回测的正式适配，不能把原型测试结果写成金融收益或隐私攻击结论。
+已验证：`python3 -m unittest discover -s tests -v` 通过 33 项测试。P1-P5、同类资产唯一恢复、旧句柄拒绝、模型幻觉回退、恢复审计、模型配置和统一 benchmark adapter 都有离线回归测试。当前还没有完成三套上游 benchmark 的正式回测，不能把原型测试结果写成金融收益或隐私攻击结论。
 
 ## 5. 模型分工与 Qwen 27B 说明
 
 这里必须区分两类模型：
 
-1. **外部/金融决策基座模型**：负责新闻理解、资产分析、风险判断和目标权重生成。用户计划使用 Qwen 27B 作为该角色；它可以通过 OpenAI-compatible vLLM/SGLang endpoint 接入 Agent。
-2. **本地隐私残余检测器**：只判断替换后的残余文本中还有没有敏感 span，推荐从 `Qwen3-0.6B` 级别开始，关闭 thinking，强制 JSON 输出。它不接触外部服务，不生成 alias，也不能修改映射。
+1. **金融决策基座模型**：负责新闻理解、资产分析、风险判断和目标权重生成。实验使用本地 `Qwen/Qwen3.8-27B`，以及企业网关提供的 DeepSeek V4 Flash 和 GLM-5.1。
+2. **本地隐私 Agent 模型**：识别残余敏感 span、提出 P1-P5 描述并审计恢复歧义。可以先用 0.6B 级模型测速度，也要和 Qwen3.8-27B 比较漏检和语义审计能力。它不能创建 alias、修改映射或绕过代码校验。
 
-截至本文日期，公开 Hugging Face 官方模型卡可确认的 27B 模型名称是 [`Qwen/Qwen3.5-27B`](https://huggingface.co/Qwen/Qwen3.5-27B)，没有在官方公开模型列表中确认 `Qwen3.8-27B`。因此新服务器必须先检查用户提供的模型目录或私有 registry 中的实际 `config.json`、`model_type` 和模型 ID；如果“3.8”只是口误，默认记录并使用 `Qwen/Qwen3.5-27B`，不得静默把一个未经确认的名称写进实验结果。27B 基座和 0.6B 本地检测器是独立部署、独立计费和独立指标。
+公开官方模型名可以确认 `Qwen/Qwen3.8-27B`、`deepseek-v4-flash` 和 `glm-5.1`。企业网关可能使用内部 alias，所以具体 DeepSeek/GLM 模型名必须由 `.env` 配置，并通过网关 `/models` 或管理员文档核验。三套金融基座和本地隐私模型的角色、版本、调用成本必须分别记录。
 
 建议 27B 通过兼容接口部署，示例以官方模型卡为准（需按服务器 GPU、vLLM 版本和上下文长度调整）：
 
 ```bash
-vllm serve Qwen/Qwen3.5-27B \
+vllm serve Qwen/Qwen3.8-27B \
   --port 8000 \
   --tensor-parallel-size <GPU数量> \
   --max-model-len <经显存审计后确定> \
@@ -249,13 +252,13 @@ FAL（Financial Association Leakage）可以作为报告总称，但在定义权
 - 尚未完成候选池扩大后的攻击 ground truth 和统一 FAL 标定；
 - 当前映射主要在内存中，生产部署仍需本地加密存储、密钥生命周期和崩溃恢复设计；
 - 当前 0.6B recognizer 需要真实中文金融残余 span 数据做准确率、漏检和误报评估；
-- Qwen3.8-27B 的公开模型身份未确认，不能把它当作已验证模型名；
+- 企业网关中的 DeepSeek/GLM 实际模型 alias 尚需在实验服务器核验；
 - “公开新闻是否直接含 ETF 代码/名称”的覆盖率必须在拉取 LFS 后实测，不能凭文件名推断。
 
 ## 12. 交接后的最小执行顺序
 
 1. 审计新服务器 GPU、CUDA、Python、磁盘、Git LFS 和模型缓存；
-2. 克隆本仓库，运行现有 21 项测试；
+2. 克隆本仓库，运行现有 33 项测试；
 3. 核验用户给出的 Qwen 27B 实际模型 ID，明确基座模型与 0.6B detector 的部署分工；
 4. 拉取 NLPCC LFS 数据，核验真实文件、日期、新闻覆盖、候选池和许可；
 5. 先用一个交易日、一个 Agent、少量候选资产完成 Vanilla -> sanitize -> 外部 LLM -> restore -> validate -> backtest smoke；
@@ -267,7 +270,7 @@ FAL（Financial Association Leakage）可以作为报告总称，但在定义权
 
 ### 可直接核验的官方材料
 
-- [Qwen/Qwen3.5-27B 官方模型卡](https://huggingface.co/Qwen/Qwen3.5-27B)
+- [Qwen/Qwen3.8-27B 官方模型卡](https://huggingface.co/Qwen/Qwen3.8-27B)
 - [NLPCC 2026 Shared Task 4 数据与 DataLoader](https://github.com/splash-li/NLPCC2026-Shared-Task-4/tree/main/NLPCC_tasks/dataset)
 - [FinScope 当前实现](../README.md)
 

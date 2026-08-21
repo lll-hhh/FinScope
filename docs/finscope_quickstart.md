@@ -1,6 +1,19 @@
 # FinScope 最小实现
 
-`finscope/` 是一个本地、无第三方依赖的隐私中间层。它不实现具体的金融策略，也不要求重写 Agent，只包住外部 LLM 客户端和本地工具执行器。
+`finscope/` 是一个基础运行无第三方依赖的本地隐私 Agent。它不实现具体的金融策略，也不要求重写 Agent，只包住外部 LLM 客户端和本地工具执行器。
+
+新代码优先使用 `LocalPrivacyAgent`。底层 `FinScopeMediator` 负责实体发现、作用域映射和确定性恢复；上层隐私 Agent 再增加 P1-P5 语义披露、typed handle 和恢复歧义审计。
+
+```python
+from finscope import LocalPrivacyAgent
+
+agent = LocalPrivacyAgent(local_security_master, default_level="P3")
+scope = agent.open_scope("task-1", "2026-08-21")
+safe = agent.sanitize(raw_prompt, scope, disclosure_level="P2")
+result = agent.restore_and_audit(external_llm(safe), scope)
+```
+
+外部文本形如 `<fin-ref type="asset" id="FS_ASSET_...">白酒股票</fin-ref>`。描述保留可控语义，句柄保证同类资产仍可唯一恢复。交易入口使用 `agent.validate_action(...)`；句柄缺失、过期或绑定冲突时默认拒绝执行。
 
 ## 实现流程
 

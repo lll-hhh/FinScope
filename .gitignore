@@ -3,5 +3,11 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .venv/
+.env
+.env.*
+!.env.example
+logs/
+traces/
+results/
 *.egg-info/
 .DS_Store

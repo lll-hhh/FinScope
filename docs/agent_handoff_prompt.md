@@ -7,7 +7,7 @@
 
 项目仓库：git@github.com:lll-hhh/FinScope.git
 主分支：main
-项目定位：面向金融多智能体的本地隐私中间层。核心目标是“同一任务/会话/交易日内代号一致，任务外/跨日不可关联”，同时保证外部大模型输出经过本地恢复后，工具调用、风控和交易执行仍能连续完成。
+项目定位：面向金融多智能体的本地隐私 Agent。核心目标是“同一任务/会话/交易日内代号一致，任务外/跨日不可关联”，同时保证外部大模型输出经过本地恢复后，工具调用、风控和交易执行仍能连续完成。
 完整背景、设计、指标和当前限制：先阅读 docs/project_background.md、README.md、docs/finscope_quickstart.md。
 
 一、先做环境审计，不要直接下载模型或跑长实验
@@ -23,20 +23,16 @@
    python3 -m unittest discover -s tests -v
    如果测试失败，先定位并记录，不要为了跑新实验删除旧测试。
 
-二、先核对 27B 模型身份，并区分两类模型
+二、核对三套模型并区分模型角色
 
-用户说计划使用“qwen3.8 27b”。截至当前项目文档核验，公开官方模型卡确认的是 Qwen/Qwen3.5-27B，而不是公开可确认的 Qwen3.8-27B。请先检查用户服务器上的真实模型目录、config.json、model_type、registry ID 和权重来源：
-
-- 如果本地确有私有/内部 Qwen3.8-27B，记录完整 ID、版本和来源，不要把它改名成 Qwen3.5；
-- 如果“3.8”只是型号口误，明确记录假设后使用 Qwen/Qwen3.5-27B；
-- 如果两者都无法确认，先报告阻塞信息和资源估算，不要静默下载一个相近模型。
+本地主模型使用公开的 `Qwen/Qwen3.8-27B`，通过 vLLM/SGLang 的 OpenAI-compatible endpoint 部署。另两个金融基座是企业网关中的 DeepSeek V4 Flash 和 GLM-5.1。网关 alias 可能与官方 `deepseek-v4-flash`、`glm-5.1` 不同，必须查询 `/models` 或管理员说明后分别填入 `EFUNDS_DEEPSEEK_MODEL`、`EFUNDS_GLM_MODEL`。所有 key 和账户 Header 只放环境变量，不得写入文件、日志或提交。
 
 模型角色必须分开：
 
-- 27B 是金融 Agent 的决策基座，负责新闻/行情理解、研究、风险判断和目标权重/交易 action；
-- 本地隐私 detector 从 Qwen3-0.6B 级别开始，关闭 thinking，只输出 JSON span。它只判断残余文本中哪些实体、代词、动作、关系或意图需要映射，不能创建 alias、不能修改映射、不能接触云端。
+- 三套模型作为金融 Agent 的决策基座，负责新闻/行情理解、研究、风险判断和目标权重/交易 action；
+- 本地隐私模型负责残余 span、P1-P5 描述和恢复语义审计。先比较 0.6B 级模型与 Qwen3.8-27B 的漏检、时延和成本；它不能创建 alias、不能修改映射、不能绕过安全主表校验。
 
-27B 优先通过 OpenAI-compatible vLLM/SGLang endpoint 接入 Agent，先审计 GPU 后再决定 tensor parallel 和 max context。不要用 27B 直接替代 0.6B 本地 detector，也不要在没有预算和磁盘确认时下载权重。
+先审计 GPU 后再决定 tensor parallel 和 max context，不要在没有预算和磁盘确认时下载权重。复制 `.env.example` 后只在密钥管理器或本地 `.env` 中填值，且确认 `.env` 被 Git 忽略。
 
 三、理解现有 FinScope 实现后再接 Agent
 
@@ -45,6 +41,9 @@
 - finscope/core.py：scope、两阶段 sanitize、映射、restore、validate_action；
 - finscope/policy.py：AdaptivePrivacyPolicy、ResidualScanPolicy、扫描门控；
 - finscope/recognizer.py：JSON span detector、校验、security-master fallback；
+- finscope/privacy_agent.py：五级语义规划、句柄绑定、恢复和歧义审计；
+- finscope/providers.py：Qwen、DeepSeek、GLM 配置；
+- finscope/benchmarks.py：三个 benchmark 的统一隐私钩子；
 - tests/ 和 examples/。
 
 你需要保留这些约束：
