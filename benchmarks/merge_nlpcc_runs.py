@@ -19,7 +19,6 @@ COMPATIBILITY_FIELDS = (
     "prompt_version",
     "model",
     "model_revision",
-    "finscope_commit",
     "finscope_disclosure_level",
     "start_date",
     "end_date",
@@ -297,12 +296,16 @@ def merge_results(documents: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
     records: List[Dict[str, Any]] = []
     histories: Dict[str, List[float]] = {}
     source_files: List[str] = []
+    source_revisions: Dict[str, str] = {}
     for document in documents:
         for row in document["main_table"]:
             method = row["method"]
             if method in table_by_method:
                 raise ValueError("duplicate method %r" % method)
             table_by_method[method] = dict(row)
+            revision = str(document["metadata"].get("finscope_commit", "unknown"))
+            table_by_method[method]["source_revision"] = revision
+            source_revisions[method] = revision
         records.extend(dict(row) for row in document["daily_records"])
         for method, values in document["portfolio_value_history"].items():
             if method in histories:
@@ -355,6 +358,7 @@ def merge_results(documents: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
             "generated_at": datetime.now(timezone.utc).isoformat(),
             "execution_mode": "method-sharded across GPUs 4, 5, and 6",
             "source_result_files": source_files,
+            "method_source_revisions": source_revisions,
         }
     )
     result = {
