@@ -16,6 +16,7 @@ from benchmarks.run_nlpcc_real import (
     rewrite_news,
     restore_and_validate,
 )
+from benchmarks.serve_transformers_openai import TransformersChatService
 from benchmarks.merge_nlpcc_runs import compute_expanded_metrics
 from benchmarks.run_nlpcc_fault_injection import perturbations
 from benchmarks.bootstrap_nlpcc_finance import evaluate as bootstrap_finance
@@ -45,6 +46,28 @@ def payload() -> dict:
 
 
 class RealNlpccRunnerTests(unittest.TestCase):
+    def test_openai_server_normalizes_text_message_parts(self):
+        messages = TransformersChatService.normalize_messages(
+            [
+                {"role": "system", "content": "system"},
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "first"},
+                        {"type": "image_url", "image_url": "ignored"},
+                        {"type": "text", "text": "second"},
+                    ],
+                },
+            ]
+        )
+        self.assertEqual(
+            messages,
+            [
+                {"role": "system", "content": "system"},
+                {"role": "user", "content": "first\nsecond"},
+            ],
+        )
+
     def setUp(self) -> None:
         self.agent = LocalPrivacyAgent(asset_catalog(), default_level="P3")
         self.fixed = {

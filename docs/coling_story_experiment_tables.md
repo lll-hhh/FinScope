@@ -1,6 +1,6 @@
 # FinScope: COLING 论文故事、实验清单与表格草案
 
-更新日期：2026-08-21。`Measured` 表示已有真实实验结果，`TBD` 表示必须补跑，`--` 表示不适用。当前结果来自 NLPCC 2026 Track 1 public A-set 的全年重放，不是官方榜单提交，也不是最终多模型统计结果。
+更新日期：2026-08-22。`Measured` 表示已有真实实验结果，`TBD` 表示必须补跑，`--` 表示不适用。当前结果来自 NLPCC 2026 Track 1 public A-set 的全年重放，不是官方榜单提交，也不是最终多模型统计结果。
 
 ## 1. 论文定位
 
@@ -171,6 +171,41 @@ FinScope 是部署在工具和外部 LLM 之间的本地 Privacy Mediation Agent
 | FinVault | GLM-5.1 | FinScope P3 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
 
 `--` 表示该方法没有身份恢复阶段，因此 Exact Restore/Unsafe Repair 不适用。FinScope 的 Unsafe Repair 主值只统计损坏、伪造、过期和越界等应拒绝输入；完整且合法的同类型句柄互换属于意图替换边界，单独在故障注入表披露，不能隐藏在聚合值中。Direct Leak 和 Execution 仍完整记录，但分别作为机制检查和 Benchmark/工作流诊断放入附录，避免与强隐私攻击和恢复指标重复。
+
+#### Table 1 指标解释
+
+前四列 `B1--B4` 是 Benchmark 原生指标槽位，含义随 Benchmark 改变；它们只用于比较同一 Benchmark 内不同模型和方法，不能跨 Benchmark 比大小：
+
+| 指标 | 含义 | 方向 |
+| --- | --- | --- |
+| Sharpe | 单位总波动承担获得的收益，衡量风险调整后的回报 | 越高越好 |
+| Return / Total Return | 测试期初始资产到最终资产的累计收益率 | 越高越好 |
+| MDD | 从历史峰值到随后谷底的最大跌幅 | 越低越好 |
+| Valid Output | 满足 NLPCC 输出格式、资产范围和数值约束的比例 | 越高越好 |
+| Sortino | 只将下行波动视为风险的风险调整收益 | 越高越好 |
+| Benign Task Success | FinVault 正常合法请求被正确完成的比例 | 越高越好 |
+| Attack Success | 攻击成功诱导 Agent 执行目标危险行为的比例 | 越低越好 |
+| Violation-free Execution | 执行结束后未触发违规工具调用或危险业务状态的比例 | 越高越好 |
+| Over-refusal | 正常合法请求被错误拒绝的比例 | 越低越好 |
+
+后六列由 FinScope 评测协议统一补充，在三个 Benchmark 上定义不变：
+
+| 指标 | 含义 | 方向 |
+| --- | --- | --- |
+| ReID@1 | 攻击者依据匿名 trace 和允许的公开侧信息，第一名猜中真实资产身份的比例 | 越低越好；同时报告候选池随机基线 |
+| Link AUC | 攻击者判断不同 scope/日期的两个匿名对象是否为同一真实实体的能力 | 越接近 0.5 越好 |
+| Exact Restore | 匿名模型输出恢复后，实体、动作和数值与本地 ground truth 完全一致的比例 | 越高越好 |
+| Unsafe Repair | 对本应拒绝的损坏、伪造、过期或歧义输出，系统错误接受并恢复成另一动作的比例 | 越低越好，目标为 0 |
+| Token Delta | 相对同 Benchmark、同模型 Vanilla 的输入输出 token 增减比例 | 越低越好；负数表示节省 |
+| E2E p95 | 从隐私预处理、模型推理到恢复校验完成的端到端延迟第 95 百分位 | 越低越好 |
+
+#### 任务模型与攻击者模型
+
+- **任务模型（victim/task model）**生成金融决策或工具动作。当前已完成单元使用 Qwen3.8-27B。
+- **当前主攻击者不是语言模型。** `ReID@1` 和 `Link AUC` 由确定性的公开证券主表与行情属性匹配 oracle 计算；它不调用 Qwen、DeepSeek 或 GLM，因此与任务模型独立，所有方法面对完全相同的攻击规则和侧信息。
+- **FinVault 的主攻击同样不需要攻击模型。** Benchmark 提供固定的对抗提示，由作为 victim 的任务模型响应并调用沙箱工具；`Attack Success` 衡量这些提示是否诱导任务模型触发危险状态。只有生成或改写新攻击提示时才需要单独的 attacker model。
+- **LLM attacker 是单独的敏感性实验。** 后续分别使用 Qwen、DeepSeek 和 GLM 读取相同匿名 trace，并显式记录 `victim_model`、`attacker_model`、候选池、查询预算和公开侧信息。即使两者都选 Qwen，也必须作为两个独立角色和调用统计，不能写成“任务模型自己攻击自己”。
+- 主表中的当前攻击结果必须标注 `attacker=public-side-information oracle`；模型攻击结果只进入攻击强度补充表，不能替换 oracle 主结果。
 
 ## 5. 补充实验表格
 
