@@ -16,6 +16,12 @@ from benchmarks.run_nlpcc_real import (
     restore_and_validate,
 )
 from benchmarks.merge_nlpcc_runs import compute_expanded_metrics
+from benchmarks.run_nlpcc_fault_injection import perturbations
+from benchmarks.run_nlpcc_privacy_attacks import (
+    candidate_signature,
+    moving_block_interval,
+    roc_auc,
+)
 
 
 def payload() -> dict:
@@ -224,6 +230,37 @@ class RealNlpccRunnerTests(unittest.TestCase):
         self.assertEqual(rewrite["average_model_latency_ms"], 15.0)
         self.assertEqual(rewrite["average_e2e_latency_ms"], 18.0)
         self.assertEqual(rewrite["rewrite_success_rate"], 1.0)
+
+    def test_attack_metrics_handle_ties_and_exclude_identity_fields(self) -> None:
+        self.assertEqual(roc_auc([1.0, 1.0], [0.0, 0.0]), 1.0)
+        self.assertEqual(roc_auc([0.5, 0.5], [0.5, 0.5]), 0.5)
+        self.assertEqual(moving_block_interval([0.25] * 20, 100, 5), (0.25, 0.25))
+        first = {"asset": "SECRET_A", "name": "Secret A", "category": "group"}
+        second = {"asset": "SECRET_B", "name": "Secret B", "category": "group"}
+        self.assertEqual(candidate_signature(first), candidate_signature(second))
+
+    def test_fault_injection_covers_execution_and_binding_failures(self) -> None:
+        representations = {
+            asset: f'<fin-ref type="asset" id="FS_ASSET_{index:08X}">金融资产</fin-ref>'
+            for index, asset in enumerate(FUND_POOL, 1)
+        }
+        variants = perturbations(
+            {},
+            representations,
+            representations,
+            {"asset": FUND_POOL[0], "action": "buy", "amount": 1000.0},
+        )
+        self.assertTrue(
+            {
+                "descriptor_without_handle",
+                "binding_descriptor_tamper",
+                "same_type_handle_swap",
+                "stale_previous_day_handle",
+                "malformed_json",
+                "numeric_out_of_range",
+                "execution_cash_violation",
+            }.issubset(variants)
+        )
 
 
 if __name__ == "__main__":
