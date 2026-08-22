@@ -132,6 +132,15 @@ case "${1:-}" in
       finvault:vanilla finvault:global_alias >"$RUN_ROOT/lane6.log" 2>&1 &
     lane6=$!
     wait "$lane4" "$lane5" "$lane6"
+    mkdir -p "$FINSCOPE_ROOT/artifacts"
+    "$PYTHON" -m benchmarks.summarize_external_matrix \
+      --run-root "$RUN_ROOT" --stockbench-root "$STOCKBENCH_ROOT" \
+      --finvault-root "$FINVAULT_ROOT" \
+      --results-root "$FINSCOPE_ROOT/benchmarks/results" \
+      --output "$FINSCOPE_ROOT/artifacts/qwen38_external_matrix_final.json"
+    "$PYTHON" -m benchmarks.finalize_qwen_external_matrix \
+      --summary "$FINSCOPE_ROOT/artifacts/qwen38_external_matrix_final.json" \
+      --document "$FINSCOPE_ROOT/docs/coling_story_experiment_tables.md"
     date -Is >"$RUN_ROOT/ALL_COMPLETE"
     ;;
   *)

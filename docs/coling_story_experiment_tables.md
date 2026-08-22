@@ -118,8 +118,8 @@ FinScope 是部署在工具和外部 LLM 之间的本地 Privacy Mediation Agent
 | NLPCC | Qwen3.8-27B | Vanilla | 2.426 | 39.45% | 6.88% | 99.18% | 100.00% | 1.000 | -- | -- | ref. | 8.216 s |
 | NLPCC | Qwen3.8-27B | Deletion | 0.000 | 0.00% | 0.00% | 0.00% | 100.00% | 1.000 | -- | -- | -3.4% | 7.751 s |
 | NLPCC | Qwen3.8-27B | LLM Rewrite | 2.165 | 36.30% | 6.86% | 100.00% | 100.00% | 1.000 | -- | -- | +10.6% | 27.663 s |
-| NLPCC | Qwen3.8-27B | Global Alias | 2.264 | 25.28% | 4.43% | 97.53% | 100.00% | 1.000 | TBD | TBD | +0.1% | 8.180 s |
-| NLPCC | Qwen3.8-27B | Episode Alias | 2.260 | 33.14% | 6.29% | 99.59% | 100.00% | 1.000 | TBD | TBD | +3.6% | 8.364 s |
+| NLPCC | Qwen3.8-27B | Global Alias | 2.264 | 25.28% | 4.43% | 97.53% | 100.00% | 1.000 | 100.00% | 0.00% | +0.1% | 8.180 s |
+| NLPCC | Qwen3.8-27B | Episode Alias | 2.260 | 33.14% | 6.29% | 99.59% | 100.00% | 1.000 | 100.00% | 0.00% | +3.6% | 8.364 s |
 | NLPCC | Qwen3.8-27B | FinScope P3 | **2.976** | 34.31% | **3.34%** | **100.00%** | **53.20%** | **0.789** | **100.00%** | **0.00%** | **-50.9%** | **7.031 s** |
 | NLPCC | DeepSeek V4 Flash | Vanilla | TBD | TBD | TBD | TBD | TBD | TBD | -- | -- | ref. | TBD |
 | NLPCC | DeepSeek V4 Flash | Deletion | TBD | TBD | TBD | TBD | TBD | TBD | -- | -- | TBD | TBD |
@@ -133,7 +133,7 @@ FinScope 是部署在工具和外部 LLM 之间的本地 Privacy Mediation Agent
 | NLPCC | GLM-5.1 | Global Alias | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
 | NLPCC | GLM-5.1 | Episode Alias | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
 | NLPCC | GLM-5.1 | FinScope P3 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| StockBench | Qwen3.8-27B | Vanilla | TBD | TBD | TBD | TBD | TBD | TBD | -- | -- | ref. | TBD |
+| StockBench | Qwen3.8-27B | Vanilla | 4.24% | 2.253 | 2.43% | 1.679 | 100.00% | 1.000 | -- | -- | ref. | 253.267 s |
 | StockBench | Qwen3.8-27B | Deletion | TBD | TBD | TBD | TBD | TBD | TBD | -- | -- | TBD | TBD |
 | StockBench | Qwen3.8-27B | LLM Rewrite | TBD | TBD | TBD | TBD | TBD | TBD | -- | -- | TBD | TBD |
 | StockBench | Qwen3.8-27B | Global Alias | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |

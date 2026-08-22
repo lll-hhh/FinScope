@@ -292,9 +292,6 @@ def main() -> None:
                     args.results_root / f"finvault_qwen38_{method}_attacks_final.json",
                     args.results_root / f"finvault_qwen38_{method}_normal_final.json",
                 )
-            token_delta = None
-            if audit and vanilla_cost and benchmark == "stockbench":
-                token_delta = audit["total_tokens"] / vanilla_cost["total_tokens"] - 1.0
             rows.append(
                 {
                     "benchmark": benchmark,
@@ -304,9 +301,21 @@ def main() -> None:
                     "native": native,
                     "privacy": catalog_privacy_attack(catalogs[benchmark], method),
                     "audit": audit,
-                    "token_delta_vs_stockbench_vanilla": token_delta,
+                    "token_delta_vs_vanilla": None,
                 }
             )
+    for benchmark in ("stockbench", "finvault"):
+        benchmark_rows = [row for row in rows if row["benchmark"] == benchmark]
+        baseline = next(row for row in benchmark_rows if row["method"] == "vanilla")
+        baseline_tokens = (baseline.get("audit") or {}).get("total_tokens")
+        if not baseline_tokens:
+            continue
+        for row in benchmark_rows:
+            audit = row.get("audit") or {}
+            if row["complete"] and audit.get("total_tokens") is not None:
+                row["token_delta_vs_vanilla"] = (
+                    audit["total_tokens"] / baseline_tokens - 1.0
+                )
     output = {
         "schema_version": 1,
         "rows": rows,
