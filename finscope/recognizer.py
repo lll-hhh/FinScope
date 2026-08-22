@@ -83,20 +83,16 @@ class JsonModelEntityRecognizer(EntityRecognizer):
     """
 
     SYSTEM_PROMPT = (
-        "You are a local financial privacy NER model. "
-        "The input has already had known sensitive terms replaced by FS_* aliases. "
-        "Find every remaining sensitive expression, including nouns (assets, "
-        "institutions, portfolios, strategies, accounts), pronouns/coreferences "
-        "such as this stock or it, action/intent verbs such as buy, reduce or "
-        "liquidate, and sensitive relations such as held-by or candidate-of. "
-        "Return JSON only in the form "
-        "{\"entities\":[{\"text\":\"AAPL\",\"type\":\"asset\","
-        "\"canonical\":null,\"refers_to\":null,\"risk\":2}]}. Allowed types "
-        "are asset, institution, portfolio, strategy, account, reference, action, "
-        "relation and intent. The text value must be copied exactly from the input. "
-        "For a reference, refers_to should be an existing FS_* alias when possible. "
-        "Risk is an integer from 1 to 4. Never return an FS_* alias as an entity. "
-        "Do not infer or invent text not present in the input."
+        "你是本地金融隐私实体识别器。输入中的FS_代号已经受保护，绝对不要把它返回为"
+        "实体。找出其余资产、机构、组合、策略、账户、指代、动作、关系和意图。只输出"
+        "合法JSON对象：{\"entities\":[{\"text\":\"原文中的精确片段\",\"type\":"
+        "\"asset|institution|portfolio|strategy|account|reference|action|relation|intent\","
+        "\"canonical\":null,\"refers_to\":null,\"risk\":1}]}。text必须逐字复制输入，"
+        "risk必须是1到4的整数，不得推断或发明输入中不存在的文字。没有实体时输出"
+        "{\"entities\":[]}。例：输入“计划减仓并转入招商银行账户”，输出"
+        "{\"entities\":[{\"text\":\"减仓\",\"type\":\"action\",\"canonical\":null,"
+        "\"refers_to\":null,\"risk\":3},{\"text\":\"招商银行账户\",\"type\":"
+        "\"account\",\"canonical\":null,\"refers_to\":null,\"risk\":4}]}。"
     )
 
     def __init__(
@@ -113,6 +109,9 @@ class JsonModelEntityRecognizer(EntityRecognizer):
         self.cache_size = cache_size
         self._cache: Dict[Tuple[str, Tuple[str, ...]], Tuple[EntitySpan, ...]] = {}
         self._lock = threading.RLock()
+        self.calls = 0
+        self.failures = 0
+        self.fallbacks = 0
 
     def recognize(
         self,
@@ -127,13 +126,16 @@ class JsonModelEntityRecognizer(EntityRecognizer):
                 return cached
 
         prompt = self._build_prompt(text, candidates)
+        self.calls += 1
         try:
             raw = self.model_call(prompt)
             spans = self._parse_and_validate(raw, text)
         except (TypeError, ValueError, json.JSONDecodeError):
+            self.failures += 1
             if self.fallback is None:
                 spans = ()
             else:
+                self.fallbacks += 1
                 spans = tuple(self.fallback.recognize(text, candidates))
 
         with self._lock:

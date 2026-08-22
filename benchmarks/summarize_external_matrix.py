@@ -206,9 +206,15 @@ def catalog_privacy_attack(
 def latest_stock_metrics(stockbench_root: Path, method: str) -> Path | None:
     report_root = stockbench_root / "storage/reports/backtest"
     if method == "vanilla":
-        patterns = ("qwen38_vanilla_full_20250301_20250731_*/metrics.json",)
+        patterns = (
+            "qwen38_vanilla_full_20250301_20250731_*/metrics.json",
+            "qwen38_vanilla_*_privacy_full_20250301_20250731_*/metrics.json",
+        )
     else:
-        patterns = (f"qwen38_{method}_full_20250303_20250731_*/metrics.json",)
+        patterns = (
+            f"qwen38_{method}_full_20250303_20250731_*/metrics.json",
+            f"qwen38_{method}_*_privacy_full_20250303_20250731_*/metrics.json",
+        )
     paths = [path for pattern in patterns for path in report_root.glob(pattern)]
     return max(paths, key=lambda item: item.stat().st_mtime) if paths else None
 

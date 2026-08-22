@@ -15,6 +15,11 @@ import time
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 from finscope import LocalPrivacyAgent
+from benchmarks.local_privacy_agent import (
+    LocalPrivacyModelConfig,
+    build_model_assisted_agent,
+    usage_delta,
+)
 
 
 METHODS = (
@@ -335,6 +340,8 @@ class ProxyConfig:
     disclosure_level: str
     seed: str
     timeout: float
+    privacy_model_base_url: str = ""
+    privacy_model_name: str = "Qwen3.5-2B"
 
 
 class PrivacyController:
@@ -349,6 +356,19 @@ class PrivacyController:
         self.lock = threading.RLock()
         self.audit_lock = threading.Lock()
         self.request_count = 0
+        self.privacy_bundle = (
+            build_model_assisted_agent(
+                [entry.as_finscope() for entry in self.catalog.entries],
+                LocalPrivacyModelConfig(
+                    name="local-qwen-privacy-agent",
+                    base_url=config.privacy_model_base_url,
+                    model=config.privacy_model_name,
+                    default_level=config.disclosure_level,
+                ),
+            )
+            if config.method == "finscope" and config.privacy_model_base_url
+            else None
+        )
         config.audit_log.parent.mkdir(parents=True, exist_ok=True)
 
     def episode_id(self, payload: Mapping[str, Any]) -> str:
@@ -395,9 +415,13 @@ class PrivacyController:
     def _finscope(self, episode: str) -> Tuple[LocalPrivacyAgent, Any]:
         with self.lock:
             if episode not in self.agents:
-                agent = LocalPrivacyAgent(
-                    [entry.as_finscope() for entry in self.catalog.entries],
-                    default_level=self.config.disclosure_level,
+                agent = (
+                    self.privacy_bundle.agent
+                    if self.privacy_bundle is not None
+                    else LocalPrivacyAgent(
+                        [entry.as_finscope() for entry in self.catalog.entries],
+                        default_level=self.config.disclosure_level,
+                    )
                 )
                 scope = agent.open_scope(
                     f"{self.config.benchmark}:{episode}",
@@ -620,6 +644,12 @@ def create_app(config: ProxyConfig, entries: Sequence[CatalogEntry]):
     def completions(payload: Dict[str, Any]) -> Dict[str, Any]:
         if payload.get("stream"):
             raise HTTPException(status_code=400, detail="streaming is not supported")
+        request_started = time.perf_counter()
+        privacy_usage_before = (
+            controller.privacy_bundle.usage()
+            if controller.privacy_bundle is not None
+            else {}
+        )
         episode = controller.episode_id(payload)
         role = controller.role(payload)
         raw_messages = payload.get("messages", [])
@@ -654,7 +684,16 @@ def create_app(config: ProxyConfig, entries: Sequence[CatalogEntry]):
                 }
             )
             raise HTTPException(status_code=502, detail="upstream model call failed") from exc
-        total_latency_ms = task_latency_ms + float(rewrite.get("latency_ms", 0.0))
+        total_latency_ms = (time.perf_counter() - request_started) * 1000
+        privacy_model_usage = (
+            usage_delta(privacy_usage_before, controller.privacy_bundle.usage())
+            if controller.privacy_bundle is not None
+            else {}
+        )
+        privacy_agent_metrics = {}
+        if config.method == "finscope" and state is not None:
+            agent, scope = state
+            privacy_agent_metrics = agent.get_metrics(scope)
         controller.audit(
             {
                 "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -670,6 +709,8 @@ def create_app(config: ProxyConfig, entries: Sequence[CatalogEntry]):
                 "rewrite": rewrite,
                 "task_latency_ms": task_latency_ms,
                 "total_latency_ms": total_latency_ms,
+                "privacy_model_usage": privacy_model_usage,
+                "privacy_agent_metrics": privacy_agent_metrics,
                 "restoration_status": restoration_status,
                 "restoration_issues": restoration_issues,
                 "exact_restore": exact_restore if state is not None else None,
@@ -689,6 +730,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--method", choices=METHODS, required=True)
     parser.add_argument("--upstream-url", required=True)
     parser.add_argument("--upstream-model", default="Qwen3.8-27B")
+    parser.add_argument("--privacy-model-base-url", default="")
+    parser.add_argument("--privacy-model-name", default="Qwen3.5-2B")
     parser.add_argument("--audit-log", type=Path, required=True)
     parser.add_argument("--disclosure-level", choices=("P1", "P2", "P3", "P4", "P5"), default="P3")
     parser.add_argument("--seed", default="finscope-external-benchmark-v1")
@@ -717,6 +760,8 @@ def main() -> None:
         disclosure_level=args.disclosure_level,
         seed=args.seed,
         timeout=args.timeout,
+        privacy_model_base_url=args.privacy_model_base_url,
+        privacy_model_name=args.privacy_model_name,
     )
     uvicorn.run(create_app(config, entries), host=args.host, port=args.port, log_level="info")
 

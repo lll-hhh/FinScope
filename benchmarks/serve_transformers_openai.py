@@ -23,7 +23,13 @@ class TransformersChatService:
     ) -> None:
         import torch
         import transformers
-        from transformers import AutoModelForImageTextToText, AutoProcessor
+        from transformers import (
+            AutoConfig,
+            AutoModelForCausalLM,
+            AutoModelForImageTextToText,
+            AutoProcessor,
+            AutoTokenizer,
+        )
 
         self.torch = torch
         self.transformers_version = transformers.__version__
@@ -31,10 +37,21 @@ class TransformersChatService:
         self.served_model_name = served_model_name
         self.max_output_tokens = max_output_tokens
         self.lock = threading.Lock()
-        self.processor = AutoProcessor.from_pretrained(
-            model_path, local_files_only=True
-        )
-        self.model = AutoModelForImageTextToText.from_pretrained(
+        config = AutoConfig.from_pretrained(model_path, local_files_only=True)
+        architectures = tuple(config.architectures or ())
+        text_only = any(name.endswith("ForCausalLM") for name in architectures)
+        if text_only:
+            self.processor = AutoTokenizer.from_pretrained(
+                model_path, local_files_only=True
+            )
+            model_class = AutoModelForCausalLM
+        else:
+            self.processor = AutoProcessor.from_pretrained(
+                model_path, local_files_only=True
+            )
+            model_class = AutoModelForImageTextToText
+        self.tokenizer = getattr(self.processor, "tokenizer", self.processor)
+        self.model = model_class.from_pretrained(
             model_path,
             dtype=torch.bfloat16,
             device_map=device,
@@ -87,10 +104,10 @@ class TransformersChatService:
                 **inputs,
                 max_new_tokens=output_limit,
                 do_sample=False,
-                pad_token_id=self.processor.tokenizer.eos_token_id,
+                pad_token_id=self.tokenizer.eos_token_id,
             )
         completion_ids = generated[0][prompt_tokens:]
-        content = self.processor.decode(completion_ids, skip_special_tokens=True).strip()
+        content = self.tokenizer.decode(completion_ids, skip_special_tokens=True).strip()
         completion_tokens = int(completion_ids.shape[-1])
         return {
             "id": "chatcmpl-" + uuid.uuid4().hex,

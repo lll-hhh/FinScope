@@ -29,7 +29,12 @@ from finscope import (
     AmbiguousRestorationError,
     LocalPrivacyAgent,
 )
-from benchmarks.run_benchmark import BackendResult, TransformersBackend
+from benchmarks.run_benchmark import BackendResult, OpenAIBackend, TransformersBackend
+from benchmarks.local_privacy_agent import (
+    LocalPrivacyModelConfig,
+    build_model_assisted_agent,
+    usage_delta,
+)
 
 
 METHODS = (
@@ -161,6 +166,8 @@ class DayRecord:
     rewrite_output_tokens: int = 0
     rewrite_latency_ms: float = 0.0
     rewrite_succeeded: Optional[bool] = None
+    privacy_model_usage: Dict[str, float] = field(default_factory=dict)
+    privacy_agent_metrics: Dict[str, int] = field(default_factory=dict)
 
 
 def parse_args() -> argparse.Namespace:
@@ -173,7 +180,27 @@ def parse_args() -> argparse.Namespace:
         help="directory containing repo/ and lfs/ from the official dataset",
     )
     parser.add_argument("--model", default="../models/Qwen3.8-27B")
+    parser.add_argument(
+        "--model-base-url",
+        default="",
+        help="OpenAI-compatible task-model endpoint; when set, --model is metadata only",
+    )
+    parser.add_argument(
+        "--model-api-key",
+        default="",
+        help="optional API key for --model-base-url; never written to result metadata",
+    )
     parser.add_argument("--device", default="cuda:0")
+    parser.add_argument(
+        "--privacy-model-base-url",
+        default="",
+        help="OpenAI-compatible endpoint for the local small privacy model",
+    )
+    parser.add_argument(
+        "--privacy-model-name",
+        default="Qwen3.5-2B",
+        help="served model ID for the local privacy Agent",
+    )
     parser.add_argument("--start-date", default="2025-01-02")
     parser.add_argument("--end-date", default="2025-12-31")
     parser.add_argument("--max-days", type=int, default=0)
@@ -1081,6 +1108,7 @@ def run_fingerprint(args: argparse.Namespace, dates: Sequence[int]) -> str:
         "commit": FINSCOPE_COMMIT,
         "source_dirty": FINSCOPE_SOURCE_DIRTY,
         "model": str(Path(args.model).resolve()),
+        "model_base_url": args.model_base_url,
         "model_revision": MODEL_REVISION,
         "dates": list(dates),
         "methods": list(args.methods),
@@ -1089,6 +1117,8 @@ def run_fingerprint(args: argparse.Namespace, dates: Sequence[int]) -> str:
         "top_rank": args.top_rank,
         "pre_k_days": args.pre_k_days,
         "max_new_tokens": args.max_new_tokens,
+        "privacy_model_base_url": args.privacy_model_base_url,
+        "privacy_model_name": args.privacy_model_name,
         "rewrite_cache": [
             hashlib.sha256(Path(path).read_bytes()).hexdigest()
             for path in args.rewrite_cache
@@ -1155,10 +1185,32 @@ def run(args: argparse.Namespace) -> Dict[str, Any]:
         if args.resume
         else None
     )
-    backend = TransformersBackend(args.model, args.device, args.max_new_tokens)
-    privacy_agent = LocalPrivacyAgent(
-        asset_catalog(), default_level=args.disclosure_level
+    backend = (
+        OpenAIBackend(
+            args.model_base_url,
+            args.model,
+            api_key=args.model_api_key or None,
+            max_new_tokens=args.max_new_tokens,
+        )
+        if args.model_base_url
+        else TransformersBackend(args.model, args.device, args.max_new_tokens)
     )
+    privacy_bundle = None
+    if args.privacy_model_base_url:
+        privacy_bundle = build_model_assisted_agent(
+            asset_catalog(),
+            LocalPrivacyModelConfig(
+                name="local-qwen-privacy-agent",
+                base_url=args.privacy_model_base_url,
+                model=args.privacy_model_name,
+                default_level=args.disclosure_level,
+            ),
+        )
+        privacy_agent = privacy_bundle.agent
+    else:
+        privacy_agent = LocalPrivacyAgent(
+            asset_catalog(), default_level=args.disclosure_level
+        )
     fixed_aliases = {
         asset: f"FIXED_ASSET_{index:03d}"
         for index, asset in enumerate(FUND_POOL, start=1)
@@ -1183,6 +1235,11 @@ def run(args: argparse.Namespace) -> Dict[str, Any]:
         prices = loader.get_price_data(list(FUND_POOL), date)
         for method in args.methods:
             portfolio = portfolios[method]
+            privacy_usage_before = (
+                privacy_bundle.usage()
+                if privacy_bundle is not None and method == "finscope"
+                else {}
+            )
             raw_payload = build_payload(loader, date, portfolio, args)
             rewrite_result = BackendResult("", 0, 0, 0.0)
             rewrite_succeeded = None
@@ -1220,6 +1277,14 @@ def run(args: argparse.Namespace) -> Dict[str, Any]:
                 scope,
                 privacy_agent,
                 alias_restore,
+            )
+            privacy_agent_metrics = (
+                privacy_agent.get_metrics(scope) if scope is not None else {}
+            )
+            privacy_model_usage = (
+                usage_delta(privacy_usage_before, privacy_bundle.usage())
+                if privacy_bundle is not None and method == "finscope"
+                else {}
             )
             # The decision sees prior-close portfolio state plus the current
             # open. Existing positions receive the current-day return only
@@ -1264,6 +1329,8 @@ def run(args: argparse.Namespace) -> Dict[str, Any]:
                     rewrite_output_tokens=rewrite_result.output_tokens,
                     rewrite_latency_ms=rewrite_result.latency_ms,
                     rewrite_succeeded=rewrite_succeeded,
+                    privacy_model_usage=privacy_model_usage,
+                    privacy_agent_metrics=privacy_agent_metrics,
                 )
             )
             if scope is not None:
@@ -1291,11 +1358,19 @@ def run(args: argparse.Namespace) -> Dict[str, Any]:
             "benchmark": "NLPCC 2026 Shared Task 4 Track 1 public A-set",
             "prompt_version": PROMPT_VERSION,
             "model": args.model,
+            "model_base_url": args.model_base_url,
             "model_revision": MODEL_REVISION,
             "finscope_commit": FINSCOPE_COMMIT,
             "finscope_source_dirty": FINSCOPE_SOURCE_DIRTY,
             "finscope_disclosure_level": args.disclosure_level,
-            "finscope_disclosure_planner": "deterministic-security-master",
+            "finscope_disclosure_planner": (
+                "model-assisted-security-master-validated"
+                if privacy_bundle is not None
+                else "deterministic-security-master"
+            ),
+            "local_privacy_model": (
+                privacy_bundle.metadata() if privacy_bundle is not None else None
+            ),
             "finscope_market_disclosure": "coarse-non-invertible-buckets-v1",
             "backend": backend.metadata,
             "generated_at": datetime.now(timezone.utc).isoformat(),

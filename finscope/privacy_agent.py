@@ -17,6 +17,7 @@ from collections.abc import Callable, Mapping, Sequence
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from .core import ActionValidationError, FinScopeMediator, Scope, ValidationResult
+from .recognizer import JsonModelEntityRecognizer
 
 
 JsonValue = Any
@@ -240,39 +241,86 @@ class JsonModelDisclosurePlanner:
         *,
         fallback: Optional[DeterministicDisclosurePlanner] = None,
         max_descriptor_length: int = 48,
+        allow_fallback: bool = True,
     ) -> None:
         self.model_call = model_call
         self.fallback = fallback or DeterministicDisclosurePlanner()
         self.max_descriptor_length = max_descriptor_length
+        self.allow_fallback = allow_fallback
         self._cache: Dict[Tuple[str, str, str], DisclosurePlan] = {}
+        self._lock = threading.RLock()
         self.calls = 0
+        self.successes = 0
+        self.fallbacks = 0
+        self.repairs = 0
 
     def plan(self, profile: AssetProfile, purpose: str = "analysis") -> DisclosurePlan:
         cache_key = (profile.canonical_id, profile.version, purpose)
-        if cache_key in self._cache:
-            return self._cache[cache_key]
-        fallback = self.fallback.plan(profile, purpose)
-        prompt = self._prompt(profile, purpose)
-        self.calls += 1
-        try:
-            payload = self._parse_json(self.model_call(prompt))
-            proposed = self._validate(payload, profile, fallback)
-        except Exception:
-            proposed = fallback
-        self._cache[cache_key] = proposed
-        return proposed
+        with self._lock:
+            if cache_key in self._cache:
+                return self._cache[cache_key]
+            fallback = self.fallback.plan(profile, purpose)
+            prompt = self._prompt(profile, purpose)
+            # Strict runs may retry transiently truncated or malformed JSON,
+            # but never substitute the deterministic plan as a successful
+            # model result. Three attempts bounds both latency and cost.
+            attempts = 3 if not self.allow_fallback else 1
+            last_error: Optional[Exception] = None
+            for _ in range(attempts):
+                self.calls += 1
+                try:
+                    payload = self._parse_json(self.model_call(prompt))
+                    proposed = self._validate(payload, profile, fallback)
+                    if proposed is fallback:
+                        last_error = ValueError(
+                            "local disclosure model did not produce a complete valid plan"
+                        )
+                        continue
+                except Exception as exc:
+                    last_error = exc
+                    continue
+                self.successes += 1
+                if any(
+                    candidate.source == "local-model-field-normalized"
+                    for candidate in proposed.candidates
+                ):
+                    self.repairs += 1
+                self._cache[cache_key] = proposed
+                return proposed
+            if not self.allow_fallback:
+                self.fallbacks += 1
+                if last_error is not None:
+                    raise last_error
+                raise ValueError(
+                    "local disclosure model did not produce a complete valid plan"
+                )
+            self.fallbacks += 1
+            self._cache[cache_key] = fallback
+            return fallback
 
     def _prompt(self, profile: AssetProfile, purpose: str) -> str:
         safe_profile = profile.attributes()
+        master_lines = "\n".join(
+            "%s=%s" % (key, value or "(空)")
+            for key, value in safe_profile.items()
+        )
         return (
-            "You are a LOCAL financial privacy planner. Create five Chinese "
-            "descriptions from P1 (most useful) to P5 (least identifying). "
-            "Use only exact non-empty values in SECURITY_MASTER. Never output "
-            "an asset name, symbol, code, unique event, or invented fact. "
-            "Return JSON only: {\"candidates\":[{\"level\":\"P1\","
-            "\"descriptor\":\"...\",\"used_attributes\":[\"...\"]},...]}.\n"
-            "PURPOSE: %s\nSECURITY_MASTER: %s" %
-            (purpose, json.dumps(safe_profile, ensure_ascii=False, sort_keys=True))
+            "你是本地金融隐私规划器，也是严格JSON复制器。只输出JSON对象，不要解释。"
+            "必须返回P1、P2、P3、P4、P5恰好五项。禁止改写、概括或替换字段值，"
+            "尤其不能把sector_l1的值用于sector_l3。每个descriptor必须等于"
+            "used_attributes按列表顺序对应的字段值直接拼接；used_attributes只能列出"
+            "确实拼接进descriptor的字段。字段为空或与已使用字段重复时可以省略，但"
+            "不能列出省略的字段。允许字段顺序：P1=size_bucket,sector_l3,asset_type；"
+            "P2=sector_l3,asset_type；P3=sector_l1,asset_type；"
+            "P4=market,asset_type；P5=asset_type。\n"
+            "SECURITY_MASTER字段（只能复制这些值）：\n%s\n"
+            "PURPOSE=%s\n输出格式：{\"candidates\":["
+            "{\"level\":\"P1\",\"descriptor\":\"字段值拼接\",\"used_attributes\":[\"字段名\"]},"
+            "{\"level\":\"P2\",\"descriptor\":\"字段值拼接\",\"used_attributes\":[\"字段名\"]},"
+            "{\"level\":\"P3\",\"descriptor\":\"字段值拼接\",\"used_attributes\":[\"字段名\"]},"
+            "{\"level\":\"P4\",\"descriptor\":\"字段值拼接\",\"used_attributes\":[\"字段名\"]},"
+            "{\"level\":\"P5\",\"descriptor\":\"字段值拼接\",\"used_attributes\":[\"字段名\"]}]}\nJSON="
+            % (master_lines, purpose)
         )
 
     @staticmethod
@@ -281,7 +329,16 @@ class JsonModelDisclosurePlanner:
         if text.startswith("```"):
             text = re.sub(r"^```(?:json)?\s*", "", text, flags=re.IGNORECASE)
             text = re.sub(r"\s*```$", "", text)
-        payload = json.loads(text)
+        decoder = json.JSONDecoder()
+        payload = None
+        for match in re.finditer(r"\{", text):
+            try:
+                candidate, _ = decoder.raw_decode(text[match.start() :])
+            except json.JSONDecodeError:
+                continue
+            if isinstance(candidate, Mapping):
+                payload = candidate
+                break
         if not isinstance(payload, Mapping):
             raise ValueError("planner response must be a JSON object")
         return payload
@@ -310,20 +367,46 @@ class JsonModelDisclosurePlanner:
             if not isinstance(descriptor, str) or not isinstance(used, Sequence):
                 continue
             descriptor = descriptor.strip()
-            used_keys = tuple(str(key) for key in used)
+            # Small local models occasionally insert spaces between Latin and
+            # CJK tokens (for example ``A 股`` for the master value ``A股``).
+            # Whitespace is presentation-only here; all substantive claims
+            # remain checked against the exact security-master attributes.
+            compact_descriptor = re.sub(r"\s+", "", descriptor)
             allowed = set(self.fallback.LEVEL_FIELDS[level])
+            # Treat the model's field list as an untrusted proposal. Keep only
+            # fields allowed for this disclosure level, remove duplicates and
+            # empty master values, then rebuild the descriptor from the
+            # surviving security-master facts.
+            proposed_keys = tuple(str(item) for item in used)
+            used_keys = tuple(
+                dict.fromkeys(
+                    key
+                    for key in proposed_keys
+                    if key in allowed and attributes.get(key)
+                )
+            )
             if (
                 not descriptor
                 or len(descriptor) > self.max_descriptor_length
-                or any(token in descriptor.casefold() for token in forbidden)
-                or any(key not in allowed for key in used_keys)
-                or any(not attributes.get(key) for key in used_keys)
-                or any(attributes[key] not in descriptor for key in used_keys)
+                or any(
+                    re.sub(r"\s+", "", token) in compact_descriptor.casefold()
+                    for token in forbidden
+                )
+                or not used_keys
                 or any(mark in descriptor for mark in ("<", ">", "FS_"))
             ):
                 continue
+            expected_descriptor = "".join(attributes[key] for key in used_keys)
+            compact_expected = re.sub(r"\s+", "", expected_descriptor)
+            source = "local-model"
+            if compact_descriptor != compact_expected:
+                # The model may select the right master fields but mis-copy or
+                # reorder their surface text. Normalize only from those
+                # validated fields; never use a full deterministic plan.
+                descriptor = expected_descriptor
+                source = "local-model-field-normalized"
             by_level[level] = DisclosureCandidate(
-                level, descriptor, used_keys, "local-model"
+                level, descriptor, used_keys, source
             )
         if len(by_level) != len(DisclosureLevel):
             return fallback
@@ -365,6 +448,7 @@ class JsonModelRecoveryAuditor:
     def __init__(self, model_call: Callable[[str], str]) -> None:
         self.model_call = model_call
         self.calls = 0
+        self.failures = 0
 
     def audit(
         self,
@@ -377,10 +461,18 @@ class JsonModelRecoveryAuditor:
             for item in bindings
         ]
         prompt = (
-            "You are a LOCAL restoration auditor. Detect ambiguity or semantic "
-            "drift. Do not repair text and do not infer a real asset. Return JSON "
-            "only: {\"issues\":[{\"code\":\"...\",\"severity\":\"warning|error\","
-            "\"message\":\"...\",\"aliases\":[\"FS_...\"]}]}.\n"
+            "你是本地恢复审计器。只检查外部结果与本地恢复结果是否存在指代歧义、"
+            "语义漂移、缺少句柄、动作矛盾或输出不完整。不要评价投资决策，不得推断"
+            "真实资产，不得修复文本或编造问题。没有问题时只输出{\"issues\":[]}。"
+            "本地恢复结果中出现安全主表里的真实名称是预期行为，不算missing_handle；"
+            "FS_ACTION、FS_ACCOUNT、FS_REF等非资产本地句柄也可以由确定性代码恢复，"
+            "不算missing_handle。只有外部可执行字段把资产语义描述或真实资产名裸露在"
+            "句柄之外，或句柄与本地绑定不一致时，才报告missing_handle。外部的"
+            "<fin-ref type=asset id=FS_...>描述</fin-ref>与本地恢复后的真实名称对应"
+            "是正常闭环。"
+            "有问题时code只允许coreference_ambiguity、semantic_drift、missing_handle、"
+            "contradictory_action、incomplete_output，severity只允许warning或error。"
+            "只输出合法JSON对象，不要Markdown。\n"
             "BINDINGS: %s\nEXTERNAL: %s\nRESTORED: %s"
             % (
                 json.dumps(binding_summary, ensure_ascii=False),
@@ -392,6 +484,7 @@ class JsonModelRecoveryAuditor:
         try:
             payload = JsonModelDisclosurePlanner._parse_json(self.model_call(prompt))
         except Exception:
+            self.failures += 1
             return (
                 AuditIssue(
                     "auditor_failure",
@@ -647,7 +740,22 @@ class LocalPrivacyAgent:
                 break
         restored = self.mediator.restore_output(unwrapped, scope)
         if self.recovery_auditor is not None:
-            issues.extend(self.recovery_auditor.audit(output, restored, state.bindings))
+            # Handle presence and binding integrity are code-owned checks. A
+            # small advisory model often describes the expected
+            # handle-to-canonical restoration as a "missing handle"; accept
+            # that issue only when the deterministic pass found the same
+            # structural defect. Other semantic findings remain advisory.
+            audited_issues = self.recovery_auditor.audit(
+                output, restored, state.bindings
+            )
+            deterministic_missing_handle = any(
+                item.code == "missing_handle" for item in issues
+            )
+            issues.extend(
+                item
+                for item in audited_issues
+                if item.code != "missing_handle" or deterministic_missing_handle
+            )
             state.metrics["semantic_auditor_calls"] += 1
         issues = self._deduplicate_issues(issues)
         if any(item.severity == "error" for item in issues):
@@ -682,6 +790,17 @@ class LocalPrivacyAgent:
         metrics.update(self._agent_state(scope).metrics)
         if isinstance(self.disclosure_planner, JsonModelDisclosurePlanner):
             metrics["disclosure_planner_calls"] = self.disclosure_planner.calls
+            metrics["disclosure_planner_successes"] = self.disclosure_planner.successes
+            metrics["disclosure_planner_fallbacks"] = self.disclosure_planner.fallbacks
+            metrics["disclosure_planner_repairs"] = self.disclosure_planner.repairs
+        if self.recovery_auditor is not None:
+            metrics["recovery_auditor_calls"] = self.recovery_auditor.calls
+            metrics["recovery_auditor_failures"] = self.recovery_auditor.failures
+        recognizer = self.mediator.entity_recognizer
+        if isinstance(recognizer, JsonModelEntityRecognizer):
+            metrics["entity_recognizer_model_calls"] = recognizer.calls
+            metrics["entity_recognizer_model_failures"] = recognizer.failures
+            metrics["entity_recognizer_fallbacks"] = recognizer.fallbacks
         return metrics
 
     def _agent_state(self, scope: Union[Scope, str]) -> _AgentScopeState:

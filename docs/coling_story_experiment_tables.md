@@ -2,6 +2,10 @@
 
 更新日期：2026-08-22。`Measured` 表示已有真实实验结果，`TBD` 表示必须补跑，`--` 表示不适用。当前结果来自 NLPCC 2026 Track 1 public A-set 的全年重放，不是官方榜单提交，也不是最终多模型统计结果。
 
+### 重跑状态（Qwen 小模型本地 Agent）
+
+此前表中的全年 Qwen3.8-27B 数字来自 deterministic local-agent 版本，只保留为 preliminary engineering reference；不能当作本地小模型最终结果。新协议固定 Qwen3.8-27B 为任务模型，另用 Qwen3.5 小模型承担本地识别、规划和审计，并在严格模式下禁止整套 fallback。当前 Qwen3.5-2B 已通过双资产三角色 toy smoke，但在 NLPCC 真实资产主表的 planner smoke 中出现不稳定字段/JSON 输出，尚未形成可报告的 NLPCC 结果；因此相关单元继续标为 `TBD`。0.8B 仅作 size ablation，4B/9B 作为候选主方法模型逐一验证。
+
 ## 1. 论文定位
 
 ### 暂定标题
@@ -103,11 +107,22 @@ FinScope 是金融多智能体系统中新增的本地语义保障 Agent：
 - Episode-scoped Opaque Alias（强基线，跨日轮换但无 P1-P5 语义与恢复 auditor）
 - FinScope
 
+### 近邻工作如何进入主表
+
+主表只加入两个最能解释 B1 差异的工程化近邻基线；它们不是对原论文的逐字复现，而是把可比较的机制接到同一金融 Agent 生命周期中：
+
+| 主表方法 | 近邻方向 | 在本项目中的适配 | 不声称复现的部分 |
+| --- | --- | --- | --- |
+| Episode Alias | SecureClaw 风格的 opaque handle、session/TTL 生命周期 | 每个交易日轮换不可读句柄，保持同日一致并在本地恢复 | 不复现其完整 trusted executor/PREVIEW-to-COMMIT 实现 |
+| LLM Rewrite | PromptGraph 风格的本地敏感 span 改写与恢复 | 在任务模型前做受约束金融标题改写，并记录事实漂移和额外成本 | 不复现其通用 span 图推理和训练流程 |
+
+Global Fixed Alias 作为经典 pseudonym 控制保留；Deletion 和 Vanilla 分别作为隐私下界与任务上界。这样主表中的每个对比方法都对应清晰的机制假设，而不是堆叠相似论文名称。
+
 ### Table 1: Benchmark x Base Model x Method 大主表
 
-每行是一个 `Benchmark x Base Model x Method` 实验单元。前四个结果列严格来自上游 Benchmark，后六个结果列严格由 FinScope 评测协议补充：
+每行是一个 `Benchmark x Base Model x Method` 实验单元。前四个结果列严格使用该行所属 Benchmark 的原生核心指标，后六个结果列在三个 Benchmark 上统一使用 FinScope 通用指标。原生指标不跨 Benchmark 比大小；通用指标才使用同一列定义比较。
 
-| Benchmark | B1 原生主指标 | B2 原生效用 | B3 原生风险/安全 | B4 原生辅助 |
+| Benchmark | 原生指标 1 | 原生指标 2 | 原生指标 3 | 原生指标 4 |
 | --- | --- | --- | --- | --- |
 | NLPCC | Sharpe ↑ | Return ↑ | MDD ↓ | Valid output ↑ |
 | StockBench | Total Return ↑ | Sortino ↑ | MDD ↓ | Sharpe ↑ |
@@ -115,7 +130,7 @@ FinScope 是金融多智能体系统中新增的本地语义保障 Agent：
 
 六个新增指标固定为：隐私 `ReID@1 / Link AUC`，恢复安全 `Exact Restore / Unsafe Repair`，成本 `Token Delta / E2E p95`。因此所有 Benchmark 和模型都使用同一套新增评测口径。
 
-| Benchmark | Base LM | Method | B1 | B2 | B3 | B4 | ReID@1 ↓ | Link AUC →.5 | Exact Restore ↑ | Unsafe Repair ↓ | Token Δ ↓ | E2E p95 ↓ |
+| Benchmark | Base LM | Method | 原生指标 1 | 原生指标 2 | 原生指标 3 | 原生指标 4 | ReID@1 ↓ | Link AUC →.5 | Exact Restore ↑ | Unsafe Repair ↓ | Token Δ ↓ | E2E p95 ↓ |
 | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | NLPCC | Qwen3.8-27B | Vanilla | 2.426 | 39.45% | 6.88% | 99.18% | 100.00% | 1.000 | -- | -- | ref. | 8.216 s |
 | NLPCC | Qwen3.8-27B | Deletion | 0.000 | 0.00% | 0.00% | 0.00% | 100.00% | 1.000 | -- | -- | -3.4% | 7.751 s |
@@ -174,9 +189,17 @@ FinScope 是金融多智能体系统中新增的本地语义保障 Agent：
 
 `--` 表示该方法没有身份恢复阶段，因此 Exact Restore/Unsafe Repair 不适用。FinScope 的 Unsafe Repair 主值只统计损坏、伪造、过期和越界等应拒绝输入；完整且合法的同类型句柄互换属于意图替换边界，单独在故障注入表披露，不能隐藏在聚合值中。Direct Leak 和 Execution 仍完整记录，但分别作为机制检查和 Benchmark/工作流诊断放入附录，避免与强隐私攻击和恢复指标重复。
 
-#### Table 1 指标解释
+#### Table 1 表后指标解释
 
-前四列 `B1--B4` 是 Benchmark 原生指标槽位，含义随 Benchmark 改变；它们只用于比较同一 Benchmark 内不同模型和方法，不能跨 Benchmark 比大小：
+主表前四个结果列不是一套跨任务分数，而是按行替换为下面对应 Benchmark 的四个原生指标：
+
+| Benchmark | 原生指标列 1 | 原生指标列 2 | 原生指标列 3 | 原生指标列 4 |
+| --- | --- | --- | --- | --- |
+| NLPCC | Sharpe | Return | MDD | Valid Output |
+| StockBench | Total Return | Sortino | MDD | Sharpe |
+| FinVault | Benign Task Success | Attack Success | Violation-free Execution | Over-refusal |
+
+原生指标含义与方向：
 
 | 指标 | 含义 | 方向 |
 | --- | --- | --- |
@@ -190,7 +213,7 @@ FinScope 是金融多智能体系统中新增的本地语义保障 Agent：
 | Violation-free Execution | 执行结束后未触发违规工具调用或危险业务状态的比例 | 越高越好 |
 | Over-refusal | 正常合法请求被错误拒绝的比例 | 越低越好 |
 
-后六列由 FinScope 评测协议统一补充，在三个 Benchmark 上定义不变：
+主表后六列由 FinScope 评测协议统一补充，在 NLPCC、StockBench、FinVault 三个 Benchmark 上定义完全不变；它们不替代 Benchmark 原生指标：
 
 | 指标 | 含义 | 方向 |
 | --- | --- | --- |
@@ -295,6 +318,33 @@ P1-P5 的具体字段定义应在论文方法表中固定，测试集上不能�
 | Gated scan | TBD | TBD | TBD |
 | - task cache | TBD | TBD | TBD |
 
+### Table 10: 本地隐私小模型消融（先在 NLPCC 上固定任务模型）
+
+任务模型固定为 Qwen3.8-27B，数据、候选池、P3 策略和攻击器固定；只替换本地 Privacy Agent 模型。严格模式禁止整套 deterministic fallback，字段选择错误可由 security master 做字段级规范化，并单独计入 `planner_repairs`。
+
+| Local privacy model | Size | Strict planner valid ↑ | Planner repair rate ↓ | Recognizer failure ↓ | Auditor failure ↓ | Fallback count ↓ | Privacy-agent token Δ ↓ | Privacy-agent p95 ↓ | NLPCC Valid ↑ | Sharpe ↑ | Status |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| Qwen3.5-0.8B | 0.8B | TBD | TBD | TBD | TBD | **not allowed** | TBD | TBD | TBD | TBD | strict role smoke failed; size ablation only |
+| Qwen3.5-2B | 2B | **100% (11/11)** | **100% (11/11)** | **0%** | **0%** | **0** | **+18,662 tok** | **118.7 s** | **100% (1/1 day)** | -- | **Measured: NLPCC one-day full pipeline** |
+| Qwen3.5-4B | 4B | 100% (11/11) toy | 100% toy | 0% toy | 0% toy | 0 toy | 1,562 tok / 5 calls toy | 7.7 s toy | TBD | TBD | candidate; real-payload run remains unstable under residual-scan load |
+| Qwen3.5-9B | 9B | TBD | TBD | TBD | TBD | **not allowed** | TBD | TBD | TBD | TBD | candidate if GPU budget permits |
+| Qwen3.5-27B | 27B | reference only | reference only | reference only | reference only | **not allowed** | TBD | TBD | TBD | TBD | task-model-sized upper bound, not final local agent |
+
+主方法从这张表中按预注册规则选择：首先满足 planner/recognizer/auditor 严格成功率和零 fallback，再在 NLPCC 开发日上比较金融效用与本地成本；不能看测试集 Sharpe 后反选。0.8B/2B 的失败记录保留在 artifact，不能写成“1B 最终结果”。
+
+小模型表中的指标含义：`Strict planner valid` 是每个资产是否在不使用整套 deterministic fallback 的情况下产出可验证 P1-P5 计划；`Planner repair rate` 是模型选出字段后，由主表对字段表面做的安全规范化比例，不表示模型完全正确；`Recognizer failure` 和 `Auditor failure` 分别是 JSON span/审计响应解析失败率；`Fallback count` 在严格最终实验中必须为 0；`Privacy-agent token Δ` 和 `p95` 只计算本地隐私 Agent 的额外调用，不把 Qwen3.8-27B 任务模型 token 混进来；`NLPCC Valid` 和 `Sharpe` 只有完成正式测试窗口后才可填写，单日 smoke 不报告 Sharpe。
+
+### Table 11: B1 完整性实验（3--4 个必须完成）
+
+| Experiment | Controlled change | Primary report | Why it is needed |
+| --- | --- | --- | --- |
+| Scope rotation | same task across adjacent trading days | stale-handle reject rate, cross-day Link AUC | 证明句柄生命周期而非字符串替换 |
+| Recovery fault injection | truncate/fabricate/swap/old handle、非法金额、schema drift | Exact Restore, Correct Reject, Unsafe Repair | 证明恢复和交易前 fail-closed |
+| Disclosure frontier | P1/P2/P3/P4/P5 with same task model | Sharpe, ReID@1, Link AUC | 证明语义披露—效用前沿 |
+| Attacker strength | oracle vs same-base Qwen attacker, query budget 1/3/5/10 | ReID@1, Holding/Action F1, Link AUC | 排除“攻击器太弱”解释 |
+
+同底座 LLM attacker 仅作为攻击强度补充实验：Qwen3.8-27B victim 配 Qwen3.8-27B attacker，二者独立上下文和调用统计；主表继续使用公开侧信息 oracle，FinVault 继续使用 Benchmark 自带攻击提示。
+
 最关键的两项是 Episode Alias 与 `handles only`。它们用于证明收益来自受验证语义，而隐私与连续性来自生命周期和恢复机制，而不是某一个字符串格式。
 
 ### Table 8: 成本与延迟（Measured）
@@ -326,18 +376,19 @@ P1-P5 的具体字段定义应在论文方法表中固定，测试集上不能�
 
 1. 实现并运行 Episode Alias 强基线，修正 baseline 命名。
 2. 实现同基座 LLM Rewrite，并将额外调用、token、延迟和事实漂移计入。
-3. 完成 NLPCC 上三基座 x 六方法主矩阵。
-4. 建立本地 attack ground truth，运行 ReID、Pool/Holding recovery、Action inference 和 Link AUC。
-5. 运行真实 trace 驱动的恢复故障注入，正式统计 Exact Restore、State Equivalence 和 Unsafe Repair。
-6. 为主要 rate 报告 95% CI；金融序列采用 paired moving-block bootstrap，不能把 243 个交易日当独立样本做普通 t-test。
+3. 先完成 NLPCC 上 Qwen3.5-0.8B/2B/4B/9B 本地隐私模型消融，选出满足严格成功率约束的主方法模型。
+4. 用选定的小模型完成 Qwen3.8-27B x NLPCC 的六方法全量重跑，再扩展到 StockBench/FinVault。
+5. 建立本地 attack ground truth，运行 ReID、Pool/Holding recovery、Action inference 和 Link AUC。
+6. 运行真实 trace 驱动的恢复故障注入，正式统计 Exact Restore、State Equivalence 和 Unsafe Repair。
+7. 为主要 rate 报告 95% CI；金融序列采用 paired moving-block bootstrap，不能把 243 个交易日当独立样本做普通 t-test。
 
 ### P1: COLING 完整性所需
 
-7. 接入 StockBench 和 FinVault，完成 3 Bench x 3 LM 的主表。
-8. 运行 P1-P5 与 Adaptive，给出隐私-效用 Pareto 曲线。
-9. 完成核心消融：handles-only、无轮换、无 security master、无 auditor、always-scan、无 cache。
-10. 补充候选池规模、查询预算、公开 side information 和跨 Agent 聚合攻击。
-11. 记录 detector/planner/auditor 调用、缓存、probe、GPU 显存/能耗和 API 成本。
+8. 接入 StockBench 和 FinVault，完成 Qwen3.8-27B 的主表，再补 DeepSeek/GLM。
+9. 运行 P1-P5 与 Adaptive，给出隐私-效用 Pareto 曲线。
+10. 完成核心消融：handles-only、无轮换、无 security master、无 auditor、always-scan、无 cache。
+11. 补充候选池规模、查询预算、公开 side information 和跨 Agent 聚合攻击。
+12. 记录 detector/planner/auditor 调用、缓存、probe、GPU 显存/能耗和 API 成本。
 
 ### P2: 增强说服力
 

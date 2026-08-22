@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import os
+import threading
+import time
 from typing import Any, Dict, Mapping, Optional, Sequence
 
 
@@ -44,6 +46,14 @@ class OpenAICompatibleChatModel:
                 api_key=profile.api_key or "EMPTY",
             )
         self._client = client
+        self._metrics_lock = threading.Lock()
+        self._metrics: Dict[str, float] = {
+            "calls": 0,
+            "failures": 0,
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "latency_ms": 0.0,
+        }
 
     def chat(
         self,
@@ -64,7 +74,25 @@ class OpenAICompatibleChatModel:
             kwargs["max_tokens"] = max_tokens
         if self.profile.extra_headers:
             kwargs["extra_headers"] = dict(self.profile.extra_headers)
-        response = self._client.chat.completions.create(**kwargs)
+        started = time.perf_counter()
+        try:
+            response = self._client.chat.completions.create(**kwargs)
+        except Exception:
+            with self._metrics_lock:
+                self._metrics["calls"] += 1
+                self._metrics["failures"] += 1
+                self._metrics["latency_ms"] += (time.perf_counter() - started) * 1000
+            raise
+        usage = getattr(response, "usage", None)
+        with self._metrics_lock:
+            self._metrics["calls"] += 1
+            self._metrics["prompt_tokens"] += int(
+                getattr(usage, "prompt_tokens", 0) or 0
+            )
+            self._metrics["completion_tokens"] += int(
+                getattr(usage, "completion_tokens", 0) or 0
+            )
+            self._metrics["latency_ms"] += (time.perf_counter() - started) * 1000
         return response.choices[0].message.content or ""
 
     def __call__(self, prompt: str) -> str:
@@ -77,6 +105,12 @@ class OpenAICompatibleChatModel:
                 {"role": "user", "content": prompt},
             )
         )
+
+    def metrics(self) -> Dict[str, float]:
+        """Return cumulative local-model usage without exposing credentials."""
+
+        with self._metrics_lock:
+            return dict(self._metrics)
 
 
 def _required_env(name: str) -> str:

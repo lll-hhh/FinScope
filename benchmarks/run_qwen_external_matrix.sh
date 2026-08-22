@@ -5,8 +5,11 @@ FINSCOPE_ROOT=${FINSCOPE_ROOT:-/home/zgx/repos/FinScope-git}
 STOCKBENCH_ROOT=${STOCKBENCH_ROOT:-/home/zgx/repos/stockbench-src}
 FINVAULT_ROOT=${FINVAULT_ROOT:-/home/zgx/repos/FinVault-src}
 PYTHON=${PYTHON:-/home/zgx/venvs/finscope-qwen38/bin/python}
-RUN_ROOT=${RUN_ROOT:-/home/zgx/runlogs/finscope_qwen_20260822/full_matrix}
+PRIVACY_TAG=${PRIVACY_TAG:-qwen35_2b}
+RUN_ROOT=${RUN_ROOT:-/home/zgx/runlogs/finscope_qwen_20260822/${PRIVACY_TAG}_local_agent_final}
 MODEL_NAME=${MODEL_NAME:-Qwen3.8-27B}
+PRIVACY_MODEL_BASE_URL=${PRIVACY_MODEL_BASE_URL:-http://127.0.0.1:8112/v1}
+PRIVACY_MODEL_NAME=${PRIVACY_MODEL_NAME:-Qwen3.5-2B}
 
 mkdir -p "$RUN_ROOT" "$FINSCOPE_ROOT/benchmarks/results"
 
@@ -25,7 +28,7 @@ health_wait() {
 run_stockbench() {
   local method=$1 gpu=$2
   local upstream_port=$((8100 + gpu)) proxy_port=$((8200 + gpu))
-  local run_id="qwen38_${method}_full_20250303_20250731_final"
+  local run_id="qwen38_${method}_${PRIVACY_TAG}_privacy_full_20250303_20250731_final"
   local audit="$RUN_ROOT/stockbench_${method}_audit.jsonl"
   local proxy_log="$RUN_ROOT/stockbench_${method}_proxy.log"
   local task_log="$RUN_ROOT/stockbench_${method}.log"
@@ -44,6 +47,8 @@ run_stockbench() {
     --benchmark stockbench --method "$method" \
     --upstream-url "http://127.0.0.1:${upstream_port}/v1" \
     --upstream-model "$MODEL_NAME" --audit-log "$audit" \
+    --privacy-model-base-url "$PRIVACY_MODEL_BASE_URL" \
+    --privacy-model-name "$PRIVACY_MODEL_NAME" \
     --port "$proxy_port" >"$proxy_log" 2>&1 &
   local proxy_pid=$!
   trap 'kill -TERM "$proxy_pid" 2>/dev/null || true' RETURN
@@ -67,8 +72,8 @@ run_finvault() {
   local proxy_log="$RUN_ROOT/finvault_${method}_proxy.log"
   local attack_log="$RUN_ROOT/finvault_${method}_attacks.log"
   local normal_log="$RUN_ROOT/finvault_${method}_normal.log"
-  local attack_output="$FINSCOPE_ROOT/benchmarks/results/finvault_qwen38_${method}_attacks_final.json"
-  local normal_output="$FINSCOPE_ROOT/benchmarks/results/finvault_qwen38_${method}_normal_final.json"
+  local attack_output="$FINSCOPE_ROOT/benchmarks/results/finvault_qwen38_${method}_${PRIVACY_TAG}_privacy_attacks_final.json"
+  local normal_output="$FINSCOPE_ROOT/benchmarks/results/finvault_qwen38_${method}_${PRIVACY_TAG}_privacy_normal_final.json"
   rm -f "$audit"
 
   cd "$FINSCOPE_ROOT"
@@ -76,6 +81,8 @@ run_finvault() {
     --benchmark finvault --benchmark-root "$FINVAULT_ROOT" --method "$method" \
     --upstream-url "http://127.0.0.1:${upstream_port}/v1" \
     --upstream-model "$MODEL_NAME" --audit-log "$audit" \
+    --privacy-model-base-url "$PRIVACY_MODEL_BASE_URL" \
+    --privacy-model-name "$PRIVACY_MODEL_NAME" \
     --port "$proxy_port" >"$proxy_log" 2>&1 &
   local proxy_pid=$!
   trap 'kill -TERM "$proxy_pid" 2>/dev/null || true' RETURN
@@ -137,9 +144,9 @@ case "${1:-}" in
       --run-root "$RUN_ROOT" --stockbench-root "$STOCKBENCH_ROOT" \
       --finvault-root "$FINVAULT_ROOT" \
       --results-root "$FINSCOPE_ROOT/benchmarks/results" \
-      --output "$FINSCOPE_ROOT/artifacts/qwen38_external_matrix_final.json"
+      --output "$FINSCOPE_ROOT/artifacts/qwen38_${PRIVACY_TAG}_external_matrix_final.json"
     "$PYTHON" -m benchmarks.finalize_qwen_external_matrix \
-      --summary "$FINSCOPE_ROOT/artifacts/qwen38_external_matrix_final.json" \
+      --summary "$FINSCOPE_ROOT/artifacts/qwen38_${PRIVACY_TAG}_external_matrix_final.json" \
       --document "$FINSCOPE_ROOT/docs/coling_story_experiment_tables.md"
     date -Is >"$RUN_ROOT/ALL_COMPLETE"
     ;;
