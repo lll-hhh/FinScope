@@ -18,6 +18,19 @@ def load_manifest(path: Path) -> Mapping[str, Any]:
     return payload
 
 
+def validate_download(target: Path) -> None:
+    if not (target / "config.json").is_file():
+        raise RuntimeError(f"download has no config.json: {target}")
+    weight_files = [
+        path
+        for path in target.iterdir()
+        if path.is_file() and path.suffix in {".safetensors", ".bin", ".pt"}
+        and path.stat().st_size > 1_000_000
+    ]
+    if not weight_files:
+        raise RuntimeError(f"download has no model weight shard: {target}")
+
+
 def download(model_id: str, target: Path, source: str) -> str:
     target.mkdir(parents=True, exist_ok=True)
     if source in {"auto", "modelscope"}:
@@ -25,6 +38,7 @@ def download(model_id: str, target: Path, source: str) -> str:
             from modelscope import snapshot_download
 
             snapshot_download(model_id, local_dir=str(target))
+            validate_download(target)
             return "modelscope"
         except ImportError:
             if source == "modelscope":
@@ -35,6 +49,7 @@ def download(model_id: str, target: Path, source: str) -> str:
     from huggingface_hub import snapshot_download
 
     snapshot_download(model_id, local_dir=str(target))
+    validate_download(target)
     return "huggingface"
 
 
@@ -59,8 +74,13 @@ def main() -> None:
             results[model_id] = "alias_required"
             continue
         if args.only_missing and (target / "config.json").is_file():
-            results[model_id] = "already_present"
-            continue
+            try:
+                validate_download(target)
+            except RuntimeError:
+                pass
+            else:
+                results[model_id] = "already_present"
+                continue
         try:
             provider = download(model_id, target, args.source)
             results[model_id] = f"downloaded:{provider}"
