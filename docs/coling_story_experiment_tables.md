@@ -310,13 +310,13 @@ P1-P5 的具体字段定义应在论文方法表中固定，测试集上不能�
 
 | Variant | Sharpe ↑ | Valid ↑ | ReID@1 ↓ | Link AUC →.5 | Exact Restore ↑ | Unsafe Repair ↓ | E2E p95 ↓ |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Full FinScope P3 | 2.976 | 100.00% | 53.20% | 0.789 | 100.00% | 0.00% | 7.031 s |
+| Full FinScope P3 | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
 | Episode-scoped opaque alias | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
 | Handles only + scope rotation | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
 | FinScope without security-master validation | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
 | FinScope without restoration auditor | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
 
-这不是把每个内部开关都做成探针；每一行都对应一个论文解释：语义是否必要、生命周期是否必要、事实验证是否必要、审计是否必要。always-scan/cache 命中等纯成本开关只保留在运行 artifact 和附录。
+这不是把每个内部开关都做成探针；每一行都对应一个论文解释：语义是否必要、生命周期是否必要、事实验证是否必要、审计是否必要。Table 1 中的旧全年数字不能直接填入此表，必须用锁定小模型在同一测试窗口重跑。always-scan/cache 命中等纯成本开关只保留在运行 artifact 和附录。
 
 ### Table 10: 本地隐私小模型正式消融（NLPCC 单平台，10 个模型，均 ≤4B）
 
