@@ -159,6 +159,8 @@ python3 -m benchmarks.download_local_privacy_models \
   --only-missing
 ```
 
+Gemma 4 4B 当前只登记了候选名；公开 ModelScope/Hugging Face ID 尚未核验。运行前需要把清单最后一项的 `model_id` 和 `local_dir` 改成服务器实际 alias/path，runner 会拒绝把缺失权重当成完整 10-model 结果。
+
 官方公开模型 ID 可写为 `Qwen/Qwen3.8-27B`、`deepseek-v4-flash` 和 `glm-5.1`。但企业网关可能使用内部别名，因此 `EFUNDS_DEEPSEEK_MODEL` 与 `EFUNDS_GLM_MODEL` 必须按网关 `/models` 返回值或管理员说明填写，代码不会擅自猜测。
 
 安装 provider 支持并配置：

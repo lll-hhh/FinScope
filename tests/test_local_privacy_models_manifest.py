@@ -16,10 +16,13 @@ class LocalPrivacyModelManifestTests(unittest.TestCase):
         self.assertLessEqual(payload["max_parameters_b"], 4.0)
         self.assertTrue(all(item["parameters_b"] <= 4.0 for item in models))
         self.assertTrue(all(item["instruction_tuned"] for item in models))
+        self.assertIn("google/gemma-4-4b-it", {item["model_id"] for item in models})
+        self.assertNotIn("microsoft/Phi-4-mini-instruct", {item["model_id"] for item in models})
         self.assertEqual(
             {item["availability"] for item in models},
-            {"ready", "download_required"},
+            {"ready", "download_required", "alias_required"},
         )
+        self.assertEqual(models[-1]["availability"], "alias_required")
 
 
 if __name__ == "__main__":

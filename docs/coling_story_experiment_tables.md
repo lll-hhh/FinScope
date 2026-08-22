@@ -335,7 +335,7 @@ P1-P5 的具体字段定义应在论文方法表中固定，测试集上不能�
 | Llama-3.2-3B-Instruct | 3B | Llama 3.2 / 2024 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | ready |
 | Gemma-3-1B-it | 1B | Gemma 3 / 2025 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | ready |
 | Gemma-3-4B-it | 4B | Gemma 3 / 2025 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | ready |
-| Phi-4-mini-instruct | 3.8B | Phi-4 / 2025 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | download required |
+| Gemma-4-4B-it | 4B | Gemma 4 / 2026 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | alias required |
 
 预注册选择规则：先要求严格 planner valid ≥99%、recognizer/auditor failure = 0、fallback = 0；满足者中优先本地 p95 和 token 更低者，再检查开发集 NLPCC Valid。开发集只用于选主方法，测试集不能反选。当前已有的双资产和单日 smoke 只用于排查服务，不填入这张正式表，也不作为论文百分比。
 

@@ -106,14 +106,15 @@
       "role": "recent cross-family upper bound"
     },
     {
-      "model_id": "microsoft/Phi-4-mini-instruct",
-      "parameters_b": 3.8,
-      "family": "Phi-4 mini",
-      "release_year": 2025,
+      "model_id": "google/gemma-4-4b-it",
+      "parameters_b": 4.0,
+      "family": "Gemma 4",
+      "release_year": 2026,
       "instruction_tuned": true,
-      "local_dir": "Phi-4-mini-instruct",
-      "availability": "download_required",
-      "role": "recent reasoning baseline"
+      "local_dir": "gemma-4-4b-it",
+      "availability": "alias_required",
+      "role": "latest cross-family upper bound",
+      "source_note": "The public ModelScope/Hugging Face ID is not verified; replace model_id/local_dir with the server's Gemma 4 4B alias or path before running."
     }
   ]
 }

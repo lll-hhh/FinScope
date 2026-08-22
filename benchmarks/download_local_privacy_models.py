@@ -55,6 +55,9 @@ def main() -> None:
     for item in manifest["models"]:
         model_id = str(item["model_id"])
         target = root / str(item["local_dir"])
+        if item.get("availability") == "alias_required":
+            results[model_id] = "alias_required"
+            continue
         if args.only_missing and (target / "config.json").is_file():
             results[model_id] = "already_present"
             continue
