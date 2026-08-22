@@ -25,11 +25,19 @@ health_wait() {
 run_stockbench() {
   local method=$1 gpu=$2
   local upstream_port=$((8100 + gpu)) proxy_port=$((8200 + gpu))
-  local run_id="qwen38_${method}_full_20250303_20250731"
+  local run_id="qwen38_${method}_full_20250303_20250731_final"
   local audit="$RUN_ROOT/stockbench_${method}_audit.jsonl"
   local proxy_log="$RUN_ROOT/stockbench_${method}_proxy.log"
   local task_log="$RUN_ROOT/stockbench_${method}.log"
   rm -f "$audit"
+
+  local cache_mode
+  cache_mode=$(cd "$STOCKBENCH_ROOT" && "$PYTHON" -c \
+    'import yaml; print(yaml.safe_load(open("config.yaml", encoding="utf-8-sig"))["cache"]["mode"])')
+  if [[ "$cache_mode" != "off" ]]; then
+    echo "StockBench cache.mode must be the quoted string \"off\"; got: $cache_mode" >&2
+    return 2
+  fi
 
   cd "$FINSCOPE_ROOT"
   "$PYTHON" -u -m benchmarks.serve_privacy_proxy \

@@ -46,7 +46,18 @@ llm_profiles:
 ```
 
 The runner uses `offline_only` data mode. All price and news data must already
-exist in StockBench's local cache.
+exist in StockBench's local cache. LLM response caching must be disabled with a
+quoted YAML string:
+
+```yaml
+cache:
+  mode: "off"
+```
+
+The quotes are required because YAML 1.1 interprets an unquoted `off` as the
+boolean `false`. StockBench does not recognize the resulting string `false` as
+a cache mode and otherwise falls back to its cache-enabled default. The matrix
+runner fails its preflight if this value is not the literal string `off`.
 
 ## FinVault
 
