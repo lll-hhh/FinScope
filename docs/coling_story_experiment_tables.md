@@ -4,7 +4,7 @@
 
 ### 重跑状态（Qwen 小模型本地 Agent）
 
-此前表中的全年 Qwen3.8-27B 数字来自 deterministic local-agent 版本，只保留为 preliminary engineering reference；不能当作本地小模型最终结果。新协议固定 Qwen3.8-27B 为任务模型，另用 Qwen3.5 小模型承担本地识别、规划和审计，并在严格模式下禁止整套 fallback。当前 Qwen3.5-2B 已通过双资产三角色 toy smoke，但在 NLPCC 真实资产主表的 planner smoke 中出现不稳定字段/JSON 输出，尚未形成可报告的 NLPCC 结果；因此相关单元继续标为 `TBD`。0.8B 仅作 size ablation，4B/9B 作为候选主方法模型逐一验证。
+此前表中的全年 Qwen3.8-27B 数字来自 deterministic local-agent 版本，只保留为 preliminary engineering reference；不能当作本地小模型最终结果。新协议固定 Qwen3.8-27B 为任务模型，另用 Qwen3.5 小模型承担本地识别、规划和审计，并在严格模式下禁止整套 fallback。当前 Qwen3.5-2B 已通过双资产三角色 toy smoke 和 11 资产单交易日 NLPCC pipeline smoke；这不是全年统计，主表的全年单元仍保持 `TBD`。全年重跑曾在第一个交易日遭遇任务模型 endpoint timeout，已记录为运行故障，恢复后必须从兼容 checkpoint 重新开始。0.8B 仅作 size ablation，4B/9B 作为候选主方法模型逐一验证。
 
 ## 1. 论文定位
 
