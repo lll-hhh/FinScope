@@ -6,11 +6,13 @@
 
 ### 暂定标题
 
-**FinScope: Lifecycle-Bound Semantic Privacy Mediation for Executable Financial Language Agents**
+**FinScope: A Local Agent for Semantic Assurance under Privacy Constraints in Financial Multi-Agent Systems**
 
 ### 一句话主张
 
-外部语言模型既需要足够的金融语义才能决策，又不应看到可重识别的资产与组合身份；FinScope 在本地签发带生命周期的类型化语义句柄，并在输出端确定性恢复、审计和 fail-closed，从而联合优化隐私、金融效用与可执行连续性。
+外部语言模型既需要足够的金融语义才能决策，又不应看到不必要的真实资产与组合身份；FinScope 作为金融多智能体系统中新加入的本地 Agent，维护受验证的金融语义与唯一句柄，在输出端确定性恢复、审计并 fail-closed，使经过保护的信息仍能可靠地支持工具和交易执行。
+
+完整的问题定义、故事边界和相关工作新颖性审计见 [`coling_problem_story_related_work.md`](coling_problem_story_related_work.md)。
 
 ### 论文不应该讲成什么
 
@@ -29,7 +31,7 @@
 
 ### Method: FinScope 的答案
 
-FinScope 是部署在工具和外部 LLM 之间的本地 Privacy Mediation Agent：
+FinScope 是金融多智能体系统中新增的本地语义保障 Agent：
 
 1. security master 提供受信资产事实；
 2. P1-P5 planner 选择最小必要语义披露；
@@ -59,10 +61,10 @@ FinScope 是部署在工具和外部 LLM 之间的本地 Privacy Mediation Agent
 
 ## 3. 预期贡献
 
-1. **Lifecycle-bound semantic handles:** 将最小必要金融语义与不可跨 scope 复用的类型化句柄绑定，而非只删除或全局替换身份。
-2. **Executable privacy mediation:** 把隐私保护扩展到 LLM 输出、工具参数、本地恢复和真实环境状态转换。
-3. **Audited fail-closed restoration:** security-master 验证描述，确定性恢复真实身份，歧义或旧句柄拒绝执行。
-4. **Evaluation protocol:** 在连续金融 Agent 中联合评测原生效用、主动隐私攻击、恢复连续性和在线成本。
+1. **Recoverable financial bindings:** 接收 A1/共享保护模块产生的 P1-P5 描述，将其绑定到 canonical entity、scope 和允许执行边界；P1-P5 本身不作为 B1 创新。
+2. **Multi-agent workflow binding:** 本地 Agent 在研究、风险、交易和工具节点间维护任务内一致、跨会话或交易日轮换的金融实体指称。
+3. **Audited fail-closed restoration:** 确定性恢复真实身份和 canonical action，歧义、伪造、损坏或过期句柄拒绝执行，并通过故障注入测量 Unsafe Repair。
+4. **Joint evaluation protocol:** 在连续金融 Agent 中联合评测原生效用、主动重识别、恢复与执行连续性和在线成本。
 
 ## 4. 主实验设计
 
