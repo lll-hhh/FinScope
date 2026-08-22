@@ -9,6 +9,7 @@ from benchmarks.serve_privacy_proxy import (
     IdentityCatalog,
     PrivacyController,
     ProxyConfig,
+    finvault_catalog,
     stockbench_catalog,
 )
 
@@ -132,6 +133,27 @@ class ExternalPrivacyProxyTests(unittest.TestCase):
             )
             self.assertEqual(metadata["status"], "ok")
             self.assertEqual(metadata["outbound_sensitive"], 1)
+
+    def test_finvault_catalog_includes_placeholders_and_structured_assets(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            dataset = root / "sandbox" / "normal_datasets"
+            dataset.mkdir(parents=True)
+            (dataset / "scenario_00_normal.json").write_text(
+                """{
+                  "queries": [{
+                    "query_prompt": "Call PHONE-000001 about AAPL",
+                    "context": {"stock_code": "AAPL", "ordinary_code": "JSON"}
+                  }]
+                }""",
+                encoding="utf-8",
+            )
+            entries = finvault_catalog(root)
+        by_id = {entry.canonical_id: entry for entry in entries}
+        self.assertIn("PHONE-000001", by_id)
+        self.assertIn("AAPL", by_id)
+        self.assertNotIn("JSON", by_id)
+        self.assertEqual(by_id["AAPL"].entity_type, "financial asset")
 
 
 if __name__ == "__main__":

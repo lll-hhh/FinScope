@@ -32,9 +32,26 @@ TOKEN_PATTERN = re.compile(
     r"PERSON|ORGANIZATION|LOCATION|CUSTOMER|ACCOUNT|ASSET|CASE-REF|SWIFT|"
     r"POLICY|DOCUMENT|EMPLOYEE|USER|PRODUCT|APPLICATION|LOAN|ALERT|ORDER|"
     r"TRANSACTION|PORTFOLIO|STRATEGY|CONTRACT|CLAIM|MERCHANT|DEVICE"
+    r"|PHONE|EMAIL|LICENSE|FACILITY|URL|BRAND|COMPANY"
     r")[A-Z0-9_-]*\d[A-Z0-9_-]*(?![A-Za-z0-9_])",
     re.IGNORECASE,
 )
+PUBLIC_ASSET_PATTERN = re.compile(
+    r"^(?:[036]\d{5}|[A-Z]{1,5})$"
+)
+PUBLIC_IDENTIFIER_FIELDS = {
+    "stock_code": ("financial asset", "listed financial asset"),
+    "stock_symbol": ("financial asset", "listed financial asset"),
+    "ticker": ("financial asset", "listed financial asset"),
+    "symbol": ("financial asset", "listed financial asset"),
+    "asset_code": ("financial asset", "listed financial asset"),
+    "fund_code": ("financial asset", "listed financial asset"),
+    "target_company": ("financial asset", "listed financial asset"),
+    "currency": ("financial asset", "currency identifier"),
+    "pledged_to": ("organization identifier", "organization identifier"),
+    "sender_country": ("location identifier", "location identifier"),
+    "receiver_country": ("location identifier", "location identifier"),
+}
 ALIAS_PATTERN = re.compile(
     r"(?<![A-Za-z0-9_])(?:GA|EA)_[A-Z]+_[A-F0-9]{10}(?![A-Za-z0-9_])",
     re.IGNORECASE,
@@ -149,6 +166,13 @@ def _entity_type(token: str) -> str:
         "CLAIM": "claim identifier",
         "MERCHANT": "merchant identifier",
         "DEVICE": "device identifier",
+        "PHONE": "phone identifier",
+        "EMAIL": "email identifier",
+        "LICENSE": "license identifier",
+        "FACILITY": "facility identifier",
+        "URL": "URL identifier",
+        "BRAND": "brand identifier",
+        "COMPANY": "company identifier",
         "CASE": "case identifier",
         "SWIFT": "financial reference",
     }.get(prefix, "benchmark identifier")
@@ -156,6 +180,21 @@ def _entity_type(token: str) -> str:
 
 def finvault_catalog(root: Path) -> List[CatalogEntry]:
     tokens: set[str] = set()
+    public_identifiers: Dict[str, Tuple[str, str]] = {}
+
+    def collect_public_assets(value: Any) -> None:
+        if isinstance(value, Mapping):
+            for key, item in value.items():
+                normalized = str(key).strip().casefold()
+                if normalized in PUBLIC_IDENTIFIER_FIELDS and isinstance(item, str):
+                    candidate = item.strip().upper()
+                    if PUBLIC_ASSET_PATTERN.fullmatch(candidate):
+                        public_identifiers[candidate] = PUBLIC_IDENTIFIER_FIELDS[normalized]
+                collect_public_assets(item)
+        elif isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+            for item in value:
+                collect_public_assets(item)
+
     for directory in ("attack_datasets", "normal_datasets", "attack_datasets_synthesis"):
         base = root / "sandbox" / directory
         if not base.is_dir():
@@ -163,10 +202,20 @@ def finvault_catalog(root: Path) -> List[CatalogEntry]:
         for path in base.rglob("*.json"):
             text = path.read_text(encoding="utf-8", errors="ignore")
             tokens.update(match.group(0) for match in TOKEN_PATTERN.finditer(text))
-    return [
+            try:
+                collect_public_assets(json.loads(text))
+            except json.JSONDecodeError:
+                continue
+    entries = [
         CatalogEntry(token, token, (), _entity_type(token), _entity_type(token))
         for token in sorted(tokens, key=lambda value: (value.casefold(), value))
     ]
+    entries.extend(
+        CatalogEntry(identifier, identifier, (), entity_type, descriptor)
+        for identifier, (entity_type, descriptor) in sorted(public_identifiers.items())
+        if identifier not in tokens
+    )
+    return entries
 
 
 def _walk_strings(value: Any) -> Iterable[str]:
