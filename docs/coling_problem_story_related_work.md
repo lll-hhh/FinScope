@@ -128,9 +128,71 @@ FinScope 作为额外的本地智能体参与工作流：在请求发出前，�
 3. **Audited restoration.** We make restoration a first-class safety boundary through deterministic binding, ambiguity auditing, state-aware action validation, and fail-closed handling of malformed, stale, forged, and out-of-scope references.
 4. **Evaluation.** We evaluate financial utility, active re-identification and linkage, restoration safety, execution continuity, and online cost under one protocol across three financial-agent benchmarks and multiple base models.
 
-## 7. 相关工作
+## 7. 当前实证证据
 
-### 7.1 文本匿名化与隐私—效用权衡
+本节只写入已经完成并可由仓库 final artifact 复核的结果。当前完整单元为 **NLPCC 2026 Track 1 public A-set x Qwen3.8-27B**：使用 2025 全年 243 个交易日逐日重放，每个方法每天做一次确定性生成；隐私攻击覆盖 2,673 个“交易日 x 候选资产”样本，候选池为 11。该结果是基于公开 A-set 的研究回放，**不是 NLPCC 官方榜单成绩**。
+
+### 7.1 六方法主结果
+
+前四列是 NLPCC 原生金融任务指标，后六列是 FinScope 协议补充的隐私、恢复安全与系统成本指标。隐私主攻击者是 `public-side-information oracle`：它使用公开证券主表属性和价格侧信息，但看不到本地句柄、持仓或映射；它不是 Qwen 任务模型本身。
+
+| Method | Sharpe ↑ | Return ↑ | MDD ↓ | Valid ↑ | ReID@1 ↓ | Link AUC →.5 | Exact Restore ↑ | Unsafe Repair ↓ | Token Δ ↓ | E2E p95 ↓ |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Vanilla | 2.426 | 39.45% | 6.88% | 99.18% | 100.00% | 1.000 | -- | -- | ref. | 8.216 s |
+| Deletion | 0.000 | 0.00% | 0.00% | 0.00% | 100.00% | 1.000 | -- | -- | -3.4% | 7.751 s |
+| LLM Rewrite | 2.165 | 36.30% | 6.86% | 100.00% | 100.00% | 1.000 | -- | -- | +10.6% | 27.663 s |
+| Global Alias | 2.264 | 25.28% | 4.43% | 97.53% | 100.00% | 1.000 | 100.00% | 0.00% | +0.1% | 8.180 s |
+| Episode Alias | 2.260 | 33.14% | 6.29% | 99.59% | 100.00% | 1.000 | 100.00% | 0.00% | +3.6% | 8.364 s |
+| **FinScope P3** | **2.976** | 34.31% | **3.34%** | **100.00%** | **53.20%** | **0.789** | **100.00%** | **0.00%** | **-50.9%** | **7.031 s** |
+
+`--` 表示方法没有身份恢复阶段，指标不适用。Deletion 的 MDD 为零是因为没有任何交易成功执行，不能解读为风险控制优势。FinScope P3 相对 Vanilla 保留 87.0% 累计收益，并将 ReID@1 从 100% 降至 53.20%，但 53.20% 仍显著高于 11 选 1 的 9.09% 随机基线，因此当前证据只支持“降低重识别风险”，不支持“完全匿名”。收益和 Sharpe 高于 Vanilla 也不能单独作为方法贡献，因为不同提示表示可能改变模型决策轨迹。
+
+### 7.2 P1-P5 隐私—效用前沿
+
+| Level | 语义粒度 | Sharpe ↑ | ReID@1 ↓ | Link AUC →.5 |
+| --- | --- | ---: | ---: | ---: |
+| P1 | 最丰富的受验证语义 | 2.047 | 93.27% | 0.872 |
+| P2 | 较丰富语义 | 1.934 | 88.10% | 0.871 |
+| P3 | 标准语义 | **2.976** | 53.20% | 0.789 |
+| P4 | 粗粒度语义 | 1.434 | 24.24% | 0.647 |
+| P5 | 最小语义/执行句柄 | 1.856 | **9.09%** | **0.500** |
+
+从 P1 到 P5，重识别和跨日关联能力整体下降，P5 达到本实验的随机基线；与此同时金融效用并不单调，P3 在当前运行中形成更合适的经验折中。P3 不能因为单次 Sharpe 最高而在测试集上事后选定，最终论文应通过开发集确定默认级别或自适应策略，再在测试集冻结评测。
+
+### 7.3 恢复、执行与故障注入
+
+FinScope P3 的自然运行执行成功率为 99.2%（241/243）；干净输出的 Exact Restore 为 100%（243/243）。在 P1-P5 自然运行汇总中，系统记录了 6 次 malformed JSON、3 次 `direct_identity_output` 审计拒绝和 1 次卖出空持仓，均应作为流程诊断保留。
+
+| Perturbation | Cases | Exact Restore ↑ | Correct Reject ↑ | Unsafe Repair ↓ |
+| --- | ---: | ---: | ---: | ---: |
+| Prefix/suffix/quotes/brackets | 243 | 100.0% | -- | 0.0% |
+| Descriptor without handle | 243 | 0.0% | 100.0% | 0.0% |
+| Binding descriptor tamper | 243 | 0.0% | 100.0% | 0.0% |
+| Truncated handle | 243 | 0.0% | 100.0% | 0.0% |
+| Fabricated handle | 243 | 0.0% | 100.0% | 0.0% |
+| **Swap two same-type handles** | **243** | **0.0%** | **0.0%** | **100.0%** |
+| Malformed JSON | 243 | 0.0% | 100.0% | 0.0% |
+| Out-of-range amount/weight | 243 | 0.0% | 100.0% | 0.0% |
+| Cash/state violation | 243 | 0.0% | 100.0% | 0.0% |
+| Stale previous-day handle | 242 | 0.0% | 100.0% | 0.0% |
+
+因此主表中的 Unsafe Repair 0% 只针对损坏、伪造、过期、缺失和业务越界等应拒绝集合。**同类型、格式完整且在当前 scope 内合法的句柄互换仍会通过解析，Unsafe Repair 为 100%**；这是当前实现无法仅凭句柄真实性识别“意图替换”的明确安全边界，必须单独披露，不能被聚合值隐藏。
+
+### 7.4 当前完成范围
+
+| Benchmark x Base LM 单元 | 状态 | 当前可报告结果 |
+| --- | --- | --- |
+| NLPCC x Qwen3.8-27B | **完成** | 六方法、P1-P5、公开侧信息 oracle、故障注入、10,000 次 paired block bootstrap |
+| StockBench x Qwen3.8-27B | 运行中 | 仅 Vanilla 完成：Return 4.24%、Sortino 2.253、MDD 2.43%、Sharpe 1.679、ReID@1 100%、Link AUC 1.000、E2E p95 253.267 s |
+| 其余 StockBench/FinVault 与其他基座模型 | 未形成最终单元 | 不写入正式比较结论 |
+
+当前完成度为 `1/9` 个 Benchmark x Base LM 完整单元。NLPCC x Qwen3.8-27B 足以证明端到端闭环可以运行，并给出首个隐私—效用—恢复—成本证据；它不足以支持跨 Benchmark、跨模型泛化。StockBench 正在运行的方法和 FinVault 的任何中间值都不得当作最终结果或填入论文主表。
+
+完整逐日记录、置信区间、成本诊断和大主表见 [`coling_story_experiment_tables.md`](coling_story_experiment_tables.md)，正式机器可读结果位于 `benchmarks/results/*_final.json`。
+
+## 8. 相关工作
+
+### 8.1 文本匿名化与隐私—效用权衡
 
 HaS 最早一批明确研究“隐藏后再找回”的 LLM prompt 框架：先替换私有实体，再用本地小模型对 LLM 结果去匿名化。Casper 和 Portcullis 也分别实现了本地占位符映射与响应重建。它们与 FinScope 的本地恢复机制直接相关，因此“本地替换并恢复 LLM 输出”不能作为 FinScope 的独立首创点。FinScope 的差异应落在证券事实约束的金融绑定、跨 Agent/跨日生命周期、确定性恢复安全和真实金融动作闭环。
 
@@ -138,7 +200,7 @@ PAPILLON 将本地模型与远程模型组合为 Privacy-Conscious Delegation，
 
 PromptGraph 是尤其接近的 2026 年预印本：它显式建模 span 隐私和上下文依赖，在本地清洗，并在一致性检查后恢复占位符。因此 FinScope 不能把“语义敏感清洗 + 本地一致性恢复”写成新颖性本身；必须以金融多 Agent 生命周期、证券主表验证、恢复故障和执行连续性与其区分。
 
-### 7.2 LLM Agent 的隐私与安全
+### 8.2 LLM Agent 的隐私与安全
 
 PrivacyAsst 面向 tool-using LLM agents，使用同态加密和属性打乱保护发送给工具的用户输入，是需要正面对比的 Agent 隐私框架之一。MAGPIE 评估多 Agent 协作中的上下文隐私，Privacy-R1 学习本地与远程模型之间的隐私路由；它们不研究金融实体的确定性恢复。
 
@@ -148,13 +210,13 @@ SecureClaw 是当前架构上最强的近邻：它在读取边界提供 opaque h
 
 RTBAS 聚焦提示注入、信息流和未授权工具调用，为 FinScope 的攻击与执行门控提供背景，但不研究经过身份保护的金融输出如何恢复为 canonical asset 和组合动作。
 
-### 7.3 金融语言智能体
+### 8.3 金融语言智能体
 
 FinCon、FinRobot 和 TradingAgents 展示了多角色辩论、工具增强和连续交易在金融语言 Agent 中的用途，但它们主要优化金融决策能力，没有提供本地身份绑定和恢复安全机制。
 
 FinHarness 是金融领域最直接的安全近邻。它使用 Query Monitor、Tool Monitor 和分级 LLM judge 对金融 Agent 的查询漂移与工具调用进行在线干预，并在 FinVault 上评测攻击成功率与正常任务批准率。FinScope 不能声称首次为金融 Agent 增加运行时安全组件；差异在于 FinHarness 判断请求和工具调用是否危险，而 FinScope 研究受保护金融实体如何保留语义、恢复身份并安全进入执行状态。
 
-## 8. B1 直接相关性判断
+## 9. B1 直接相关性判断
 
 上一节中的通用隐私工作用于检查组件是否已有先例，不能直接视为 B1 的同题工作。B1 的直接竞争工作必须同时满足三个硬条件：
 
@@ -162,7 +224,7 @@ FinHarness 是金融领域最直接的安全近邻。它使用 Query Monitor、T
 2. 系统包含独立的本地保护角色或可信组件，并跨研究、风险、交易和工具节点维护状态；
 3. 研究终点包含“保护表示 -> 外部推理 -> 本地身份/动作恢复 -> 金融执行”，而不只测输入匿名化或危险工具拦截。
 
-### 8.1 按 B1 硬条件筛选
+### 9.1 按 B1 硬条件筛选
 
 | 工作 | 金融 | 多智能体 | 本地保护角色 | 身份/语义保护 | 本地恢复 | 金融执行闭环 | 与 B1 的关系 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -178,7 +240,7 @@ FinHarness 是金融领域最直接的安全近邻。它使用 Query Monitor、T
 
 按这三个条件，截至 2026-08-22，本次检索**没有发现与 B1 完全同题的工作**。现有文献分成两边：金融多智能体工作不研究身份保护与恢复；多 Agent 隐私和安全工作不研究金融实体恢复后的交易连续性。FinScope 的研究空间正是两者的交叉，而不是重新发明任意一边已有的单个组件。
 
-### 8.2 金融多智能体中受保护信息的恢复与执行：相关工作研究版图
+### 9.2 金融多智能体中受保护信息的恢复与执行：相关工作研究版图
 
 | 问题 / 方案 | 受保护表示与语义保留 | 跨 Agent 状态与生命周期 | 本地恢复与真实实体重绑定 | 工具、动作与执行保障 |
 | --- | --- | --- | --- | --- |
@@ -191,7 +253,7 @@ FinHarness 是金融领域最直接的安全近邻。它使用 Query Monitor、T
 
 这张表表达的是研究交叉点，而不是声称 FinScope 的每个组件都是首次提出。现有文本隐私工作集中在第一列和第三列；通用 Agent 隐私工作集中在前两列或第四列；金融多智能体工作集中在第二列和第四列。当前没有一项既有工作同时覆盖 B1 所需的四列，并把第三列的恢复错误作为金融执行风险进行评测。
 
-## 9. 新颖性审计
+## 10. 新颖性审计
 
 ### 不能再声称的内容
 
@@ -213,7 +275,7 @@ FinHarness 是金融领域最直接的安全近邻。它使用 Query Monitor、T
 
 这支持一个“问题与评测闭环”的贡献，但不足以无条件声称基础机制首创。论文最稳妥的表述是 `we formulate`、`we operationalize`、`we develop` 和 `we evaluate`。只有在投稿前完成系统文献检索并确认没有遗漏时，才考虑带限定条件的 `to our knowledge`。
 
-## 10. 编号参考文献（最相关的 16 篇）
+## 11. 编号参考文献（最相关的 16 篇）
 
 [1] Chen et al. [Hide and Seek (HaS): A Lightweight Framework for Prompt Privacy Protection](https://arxiv.org/abs/2309.03057). arXiv, 2023.
 
@@ -247,7 +309,7 @@ FinHarness 是金融领域最直接的安全近邻。它使用 Query Monitor、T
 
 [16] Jia et al. [FinHarness: An Inline Lifecycle Safety Harness for Finance LLM Agents](https://arxiv.org/abs/2605.27333). arXiv preprint, 2026.
 
-## 11. 投稿前必须补的证据
+## 12. 投稿前必须补的证据
 
 1. 把 SecureClaw、PromptGraph、MNC、OCELOT、Portcullis 和 FinHarness 加入 Related Work，并在正文中主动承认重合组件。
 2. 主实验保留 Deletion、LLM Rewrite、Global Alias 和 Episode Alias；如工程允许，至少增加一个“opaque handle + fixed bounded summary + deterministic restore”的 SecureClaw-style 强基线。
