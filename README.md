@@ -394,6 +394,7 @@ docs/                     背景、快速入门和服务器交接提示词
 - [完整项目背景](docs/project_background.md)
 - [基础实现说明](docs/finscope_quickstart.md)
 - [COLING 故事、实验清单与表格](docs/coling_story_experiment_tables.md)
+- [StockBench/FinVault 接入与 Qwen 全量调度](docs/external_benchmark_integration.md)
 - [服务器交接启动提示词](docs/agent_handoff_prompt.md)
 
 ## 12. 安全与复现底线

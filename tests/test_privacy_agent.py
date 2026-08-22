@@ -98,6 +98,28 @@ class PrivacyAgentTests(unittest.TestCase):
                 execution=True,
             )
 
+    def test_descriptor_without_handle_is_warning_outside_execution(self) -> None:
+        self.agent.sanitize(["贵州茅台", "五粮液"], self.scope, disclosure_level="P2")
+        result = self.agent.restore_and_audit("白酒股票 outlook", self.scope)
+        self.assertEqual(result.status, "needs_retry")
+        self.assertEqual({item.code for item in result.issues}, {"missing_handle"})
+
+    def test_short_ascii_identifier_requires_token_boundaries(self) -> None:
+        agent = LocalPrivacyAgent(
+            [
+                {
+                    "canonical_id": "V",
+                    "name": "V",
+                    "asset_type": "stock",
+                    "sector_l1": "Financials",
+                }
+            ]
+        )
+        scope = agent.open_scope("short-symbol", "2026-08-22")
+        agent.sanitize("V", scope, disclosure_level="P3")
+        result = agent.restore_and_audit("Value remains stable", scope)
+        self.assertEqual(result.status, "safe")
+
     def test_descriptor_in_reason_does_not_block_handle_bound_action(self) -> None:
         safe_asset = self.agent.sanitize(
             "贵州茅台", self.scope, disclosure_level="P2"

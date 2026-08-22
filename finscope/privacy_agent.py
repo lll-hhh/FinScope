@@ -597,7 +597,9 @@ class LocalPrivacyAgent:
                 if descriptor and descriptor in outside_text:
                     if execution and not require_handle:
                         continue
-                    severity = "error" if execution or len(aliases) > 1 else "warning"
+                    # Bare descriptors in explanatory text are audit evidence,
+                    # but only executable fields must carry a recoverable handle.
+                    severity = "error" if execution else "warning"
                     issues.append(
                         AuditIssue(
                             "missing_handle",
@@ -634,7 +636,11 @@ class LocalPrivacyAgent:
                 )
         external_text = json.dumps(output, ensure_ascii=False) if not isinstance(output, str) else output
         for profile in set(self._profiles.values()):
-            if any(identifier and identifier in external_text for identifier in profile.identifiers()):
+            if any(
+                self._contains_identifier(external_text, identifier)
+                for identifier in profile.identifiers()
+                if identifier
+            ):
                 issues.append(
                     AuditIssue("direct_identity_output", "error", "external output contains a real asset identifier")
                 )
@@ -723,6 +729,24 @@ class LocalPrivacyAgent:
     def _find_aliases(cls, value: JsonValue) -> Tuple[str, ...]:
         raw = json.dumps(value, ensure_ascii=False) if not isinstance(value, str) else value
         return tuple(match.group(0).upper() for match in cls._ALIAS_PATTERN.finditer(raw))
+
+    @staticmethod
+    def _contains_identifier(text: str, identifier: str) -> bool:
+        if not identifier:
+            return False
+        if (
+            identifier[0].isascii()
+            and identifier[-1].isascii()
+            and (identifier[0].isalnum() or identifier[0] == "_")
+            and (identifier[-1].isalnum() or identifier[-1] == "_")
+        ):
+            pattern = (
+                r"(?<![A-Za-z0-9_])"
+                + re.escape(identifier)
+                + r"(?![A-Za-z0-9_])"
+            )
+            return re.search(pattern, text, flags=re.IGNORECASE) is not None
+        return identifier.casefold() in text.casefold()
 
     @staticmethod
     def _deduplicate_issues(issues: Sequence[AuditIssue]) -> List[AuditIssue]:
