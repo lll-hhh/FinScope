@@ -1,0 +1,119 @@
+{
+  "schema_version": 1,
+  "max_parameters_b": 4.0,
+  "selection_split": {
+    "benchmark": "NLPCC 2026 Track 1 public A-set",
+    "task_model": "Qwen/Qwen3.8-27B",
+    "development_trading_days": 20,
+    "test_trading_days": "remaining days after the fixed development prefix",
+    "disclosure_level": "P3",
+    "fallback_allowed": false,
+    "roles": [
+      "residual_entity_recognition",
+      "disclosure_planning",
+      "recovery_audit"
+    ]
+  },
+  "models": [
+    {
+      "model_id": "Qwen/Qwen3.5-0.8B",
+      "parameters_b": 0.8,
+      "family": "Qwen3.5",
+      "release_year": 2026,
+      "instruction_tuned": true,
+      "local_dir": "Qwen3.5-0.8B",
+      "availability": "ready",
+      "role": "size floor"
+    },
+    {
+      "model_id": "Qwen/Qwen3.5-2B",
+      "parameters_b": 2.0,
+      "family": "Qwen3.5",
+      "release_year": 2026,
+      "instruction_tuned": true,
+      "local_dir": "Qwen3.5-2B",
+      "availability": "ready",
+      "role": "current candidate"
+    },
+    {
+      "model_id": "Qwen/Qwen3.5-4B",
+      "parameters_b": 4.0,
+      "family": "Qwen3.5",
+      "release_year": 2026,
+      "instruction_tuned": true,
+      "local_dir": "Qwen3.5-4B",
+      "availability": "ready",
+      "role": "same-family upper bound"
+    },
+    {
+      "model_id": "Qwen/Qwen3-0.6B",
+      "parameters_b": 0.6,
+      "family": "Qwen3",
+      "release_year": 2025,
+      "instruction_tuned": true,
+      "local_dir": "Qwen3-0.6B",
+      "availability": "download_required",
+      "role": "recent small baseline"
+    },
+    {
+      "model_id": "Qwen/Qwen3-1.7B",
+      "parameters_b": 1.7,
+      "family": "Qwen3",
+      "release_year": 2025,
+      "instruction_tuned": true,
+      "local_dir": "Qwen3-1.7B",
+      "availability": "download_required",
+      "role": "recent small baseline"
+    },
+    {
+      "model_id": "meta-llama/Llama-3.2-1B-Instruct",
+      "parameters_b": 1.0,
+      "family": "Llama 3.2",
+      "release_year": 2024,
+      "instruction_tuned": true,
+      "local_dir": "Llama-3.2-1B-Instruct",
+      "availability": "ready",
+      "role": "older open baseline"
+    },
+    {
+      "model_id": "meta-llama/Llama-3.2-3B-Instruct",
+      "parameters_b": 3.0,
+      "family": "Llama 3.2",
+      "release_year": 2024,
+      "instruction_tuned": true,
+      "local_dir": "Llama-3.2-3B-Instruct",
+      "availability": "ready",
+      "role": "older open baseline"
+    },
+    {
+      "model_id": "google/gemma-3-1b-it",
+      "parameters_b": 1.0,
+      "family": "Gemma 3",
+      "release_year": 2025,
+      "instruction_tuned": true,
+      "local_dir": "gemma-3-1b-it",
+      "availability": "ready",
+      "role": "recent cross-family baseline"
+    },
+    {
+      "model_id": "google/gemma-3-4b-it",
+      "parameters_b": 4.0,
+      "family": "Gemma 3",
+      "release_year": 2025,
+      "instruction_tuned": true,
+      "local_dir": "gemma-3-4b-it",
+      "availability": "ready",
+      "role": "recent cross-family upper bound"
+    },
+    {
+      "model_id": "microsoft/Phi-4-mini-instruct",
+      "parameters_b": 3.8,
+      "family": "Phi-4 mini",
+      "release_year": 2025,
+      "instruction_tuned": true,
+      "local_dir": "Phi-4-mini-instruct",
+      "availability": "download_required",
+      "role": "recent reasoning baseline"
+    }
+  ]
+}

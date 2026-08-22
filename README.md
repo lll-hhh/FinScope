@@ -136,9 +136,28 @@ privacy_agent.close_scope(scope)
 | 名称 | 部署 | 配置用途 |
 | --- | --- | --- |
 | Qwen3.8-27B | 本地 vLLM/SGLang/OpenAI-compatible 服务 | 金融任务基座；不作为最终本地隐私 Agent |
-| Qwen3.5-0.8B/2B/4B/9B | 本地 Transformers/OpenAI-compatible 服务 | 本地隐私 Agent 候选，先做严格小模型消融 |
+| 10 个 ≤4B instruction-tuned 小模型 | 本地 Transformers/OpenAI-compatible 服务 | NLPCC 固定开发集上的本地隐私 Agent 消融；清单见 `benchmarks/local_privacy_models.json` |
 | DeepSeek V4 Flash | 企业 OpenAI-compatible 网关 | 外部基座对照 |
 | GLM-5.1 | 企业 OpenAI-compatible 网关 | 外部基座对照 |
+
+本地 10-model NLPCC 开发集消融由 `benchmarks/run_nlpcc_local_model_ablation.py` 顺序启动模型服务；缺失权重会明确记录为 `missing_weights`，不会静默退回另一个模型：
+
+```bash
+python3 -m benchmarks.run_nlpcc_local_model_ablation \
+  --nlpcc-root /path/to/nlpcc2026 \
+  --task-model-base-url http://127.0.0.1:8104/v1 \
+  --model-root /path/to/models \
+  --device cuda:4
+```
+
+缺失的公开权重可先按同一清单下载：
+
+```bash
+python3 -m benchmarks.download_local_privacy_models \
+  --manifest benchmarks/local_privacy_models.json \
+  --model-root /path/to/models \
+  --only-missing
+```
 
 官方公开模型 ID 可写为 `Qwen/Qwen3.8-27B`、`deepseek-v4-flash` 和 `glm-5.1`。但企业网关可能使用内部别名，因此 `EFUNDS_DEEPSEEK_MODEL` 与 `EFUNDS_GLM_MODEL` 必须按网关 `/models` 返回值或管理员说明填写，代码不会擅自猜测。
 
@@ -288,43 +307,24 @@ trace = adapter.close_episode("20250102-track1")
 
 ## 9. 必须完成的实验矩阵
 
-### E1 主实验：3 Bench × 5 方法 × 3 基座
+### E1 主实验：3 Bench × 6 方法 × 3 基座
 
-对 NLPCC、StockBench、FinVault 分别运行 Vanilla、Deletion、LLM Rewrite、Episode Fixed Alias、FinScope；金融模型分别使用 Qwen3.8-27B、DeepSeek V4 Flash、GLM-5.1。固定 prompt、temperature、数据切分、Agent 工具、随机种子和预算。至少 3 个独立种子；连续交易任务还要报告不同市场时间窗，而不是只跑最好的一段。
+对 NLPCC、StockBench、FinVault 分别运行 Vanilla、Deletion、LLM Rewrite、Global Fixed Alias、Episode Alias、FinScope；金融模型分别使用 Qwen3.8-27B、DeepSeek V4 Flash、GLM-5.1。固定 prompt、temperature、数据切分、Agent 工具、随机种子和预算。至少 3 个独立种子；连续交易任务还要报告不同市场时间窗，而不是只跑最好的一段。
 
 输出三张主表：金融/正常任务效用表、隐私攻击表、恢复连续性与成本表。不同 benchmark 的原生分数不能硬平均；共用指标可以按 benchmark 分组报告。
 
-### E2 五级披露实验：P1-P5
+### E2-E5 NLPCC 单平台正式补充实验
 
-只对 FinScope 分别跑 P1、P2、P3、P4、P5，绘制：
+为了让补充实验直接服务 B1 主线，E2-E5 全部固定在 NLPCC 2026 Track 1 public A-set：官方 DataLoader、2025 年真实交易日、11 个候选资产、Qwen3.8-27B 任务模型和 Table 10 选出的本地模型。前 20 个交易日只用于模型选择/Adaptive 标定，后续交易日用于正式报告。
 
-- 披露等级 vs Asset ReID / Cross-Day Link；
-- 披露等级 vs 原生金融指标和任务完成率；
-- 披露等级 vs 恢复成功、重试和时延；
-- 每级描述的 k-anonymity/候选集大小、唯一描述比例和平均信息字段数。
+- **E2 本地小模型消融：** 按 `benchmarks/local_privacy_models.json` 跑完 10 个不超过 4B 的 instruction-tuned 模型；比较严格 planner valid、recognizer/auditor failure、fallback、token/p95、NLPCC Valid 和 Sharpe。主模型先按严格成功率和成本预注册选择，不能用测试收益反选。
+- **E3 P1-P5 披露前沿：** 固定选定小模型，只改变 P1/P2/P3/P4/P5；报告 Sharpe、Return、MDD、ReID@1、Link AUC、Exact Restore 和 Unsafe Repair，回答语义信息量如何改变隐私和金融效用。
+- **E4 三角色作用域回放：** 在每个真实交易日让 research/risk/trade 三个逻辑角色共享同一 scope，换日轮换；比较 Global Alias、Episode Alias 和 FinScope 的同日绑定一致性、跨日 Link AUC、旧句柄拒绝和工作流完成率。
+- **E5 真实 trace 恢复安全：** 从已接受的 FinScope 模型输出和对应 portfolio state 生成截断、伪造、过期、同类交换、schema/numeric 越界扰动，再走 NLPCC action 执行器；报告 Exact Restore、Correct Reject、Unsafe Repair、State Equivalence 和执行中断率。
 
-这组结果用来回答“白酒股票比纯代号多泄露了多少、又保留了多少效用”，也是以后训练或标定 Adaptive 策略的数据。
+双资产 smoke、单元测试和 synthetic portfolio 只用于工程回归，不进入 E2-E5 的论文百分比。
 
-### E3 自适应策略
-
-先用开发集拟合 `purpose -> 最低可用披露级别`，例如研究阶段 P2、风险阶段 P3、执行阶段 P5；约束条件是恢复/任务完成不低于设定阈值，目标最小化泄露和成本。把标定结果写入 `EmpiricalDisclosurePolicy`，只能在未参与标定的测试集报告结果。对比固定 P1-P5 和 Adaptive，禁止在测试集上挑级别。
-
-### E4 恢复鲁棒性与故障注入（B1 核心）
-
-对模型匿名输出自动注入：
-
-- 句柄前后增加中英文前缀、后缀、引号、括号和所有格；
-- 删除句柄但保留“该股/白酒股票”；
-- 交换两个同类资产句柄；
-- 复制、截断、大小写改变或编造旧句柄；
-- 把数值字符串改成文本、权重和不为 1、数量越界；
-- 多轮中将“它/该股/上述标的”指向错误对象；
-- 工具返回结构变更、模型重试和部分 JSON；
-- 上一交易日句柄重放到新交易日。
-
-报告 Exact Restoration、State Equivalence、拒绝/重试率和 Unsafe Repair。任何歧义宁可拒绝，不得为了提高成功率静默猜测。
-
-### E5 隐私攻击
+### E6 隐私攻击
 
 统一攻击者可观察所有外发 prompt/output、跨 Agent trace 和跨日 trace，并可使用公开新闻行情。至少包括：
 
@@ -340,29 +340,11 @@ trace = adapter.close_episode("20250102-track1")
 
 攻击模型不能看到本地映射 ground truth；ground truth 只由离线评分器读取。报告随机基线和至少一种强攻击模型。
 
-### E6 Privacy Agent 消融
+### E7 NLPCC 机制消融和成本诊断
 
-- 只有规则/security master；
-- 规则 + 本地残余识别；
-- 再加 P1-P5 planner；
-- 再加确定性恢复审计；
-- 完整系统 + 本地语义 auditor；
-- 去掉事实校验，让模型描述直接生效；
-- 去掉句柄，仅保留“白酒股票”等描述；
-- 去掉 scope 轮换或改成全局固定句柄；
-- always scan vs gated scan；
-- 无 cache vs cache；
-- 无代词复用 vs 有代词复用。
+正式机制消融只保留四个可解释变体：Episode-scoped opaque alias、handles-only + scope rotation、无 security-master validation、无 restoration auditor。always-scan、cache hit、probe 和门控只作为成本诊断，不单独包装成论文探针。
 
-这组实验用于证明贡献来自“可验证的隐私 Agent 和恢复机制”，而不是普通字符串替换。
-
-### E7 模型和成本实验
-
-- 三个 27B/云端基座的金融效用、泄露和格式遵循差异；
-- 隐私规划/审计使用 Qwen3.5-0.8B/2B/4B/9B 候选模型，比较严格成功率、字段规范化、漏检、时延和成本；Qwen3.8-27B 只作为任务模型或小模型上界参考，不能作为最终本地隐私 Agent；
-- 连续无新实体时门控节省多少调用，风险信号后能否重新唤醒；
-- 冷启动、缓存命中和周期 probe 的 p50/p95；
-- 如果 0.6B 漏检过高，再逐级增大模型，不能只因“小”而选它。
+三套金融决策基座的跨 Benchmark 对比仍属于主表矩阵；本地小模型的 10-model 消融只在 NLPCC 上完成，Qwen3.8-27B 不作为本地隐私 Agent 候选。
 
 ## 10. A1 与 B1 的论文边界
 

@@ -30,7 +30,7 @@
 模型角色必须分开：
 
 - 三套模型作为金融 Agent 的决策基座，负责新闻/行情理解、研究、风险判断和目标权重/交易 action；
-- 本地隐私模型负责残余 span、P1-P5 描述和恢复语义审计。先在 NLPCC 固定 Qwen3.8-27B 任务模型，比较 Qwen3.5-0.8B/2B/4B/9B 的严格成功率、字段规范化、漏检、时延和成本；Qwen3.8-27B 只能作为任务模型或上界参考，不能作为最终本地隐私 Agent。它不能创建 alias、不能修改映射、不能绕过安全主表校验；严格实验禁止整套 deterministic fallback 冒充模型成功。
+- 本地隐私模型负责残余 span、P1-P5 描述和恢复语义审计。先在 NLPCC 固定 Qwen3.8-27B 任务模型，按 `benchmarks/local_privacy_models.json` 比较 10 个不超过 4B 的 instruction-tuned 模型：Qwen3.5-0.8B/2B/4B、Qwen3-0.6B/1.7B、Llama-3.2-1B/3B-Instruct、Gemma-3-1B/4B-it 和 Phi-4-mini-instruct。Qwen3.8-27B 只能作为任务模型或上界参考，不能作为最终本地隐私 Agent。它不能创建 alias、不能修改映射、不能绕过安全主表校验；严格实验禁止整套 deterministic fallback 冒充模型成功。
 
 先审计 GPU 后再决定 tensor parallel 和 max context，不要在没有预算和磁盘确认时下载权重。复制 `.env.example` 后只在密钥管理器或本地 `.env` 中填值，且确认 `.env` 被 Git 忽略。
 
@@ -83,9 +83,9 @@
 2. baseline_decision.md：为什么先选 TradingAgents，另两个框架为何延期；
 3. NLPCC adapter：至少支持一个交易日的新闻、行情、目标权重和 mock/backtest；
 4. trace schema：匿名外发 trace、本地映射 ground truth、恢复和执行结果分离；
-5. Vanilla vs FinScope smoke：验证任务完成、工具参数恢复、action 合法、scope 内 alias 一致、换日后 alias 轮换；
-6. detector gating smoke：证明稳定输入会 skip，风险关键词/隐私升级/周期 probe 会重新调用 0.6B；
-7. 只有上述产物通过后，才开始主实验和攻击实验。
+5. Vanilla vs FinScope smoke：仅作为工程检查，验证任务完成、工具参数恢复、action 合法、scope 内 alias 一致、换日后 alias 轮换；
+6. 按固定 20 日开发窗口跑完 10 个小模型，锁定本地主模型后再打开测试窗口；
+7. 只有上述产物通过后，才开始 Table 11 的 P1-P5、三角色作用域回放和真实 trace 故障注入。
 
 六、攻击与评测先按 B1 特性设计
 
@@ -97,9 +97,15 @@
 
 成本报告：本地 detector 调用/跳过/probe、p50/p95 本地延迟、外部 token、外部调用次数、重试次数和端到端 p50/p95。
 
-对照/消融至少包括：Vanilla、direct deletion、LLM rewrite、global fixed alias、episode-fixed alias、FinScope、always-scan、无 security-master validation、无 coreference reuse、static privacy、adaptive privacy。不要同时改变模型、数据、候选池和 alias 策略，否则无法解释结果。
+主表对照包括 Vanilla、direct deletion、LLM rewrite、global fixed alias、episode alias 和 FinScope；NLPCC 正式机制补充只包括 handles-only + scope rotation、无 security-master validation 和无 restoration auditor。always-scan、cache、probe 等仅作成本诊断，不单独包装成论文探针。不要同时改变模型、数据、候选池和 alias 策略，否则无法解释结果。
 
-七、工程和安全规则
+七、正式补充实验的统一平台
+
+所有论文补充实验固定在 NLPCC 2026 Track 1 public A-set：Qwen3.8-27B 任务模型、官方 DataLoader、11 个候选资产和同一回测执行器。前 20 个交易日是开发集，其余交易日是正式测试集。
+
+正式补充只包括：10-model 本地 Agent 消融、P1-P5 隐私-效用前沿、research/risk/trade 三角色作用域回放、真实 portfolio trace 恢复故障注入。双资产 smoke、synthetic portfolio、单元测试和 always-scan/cache probe 只能作为工程诊断，不得填入论文主补充表。
+
+八、工程和安全规则
 
 - 不执行真实交易，只用 mock/paper-trading/backtest；
 - 不上传 .env、API key、真实账户、真实持仓、完整 mapping 或未获许可的数据；
@@ -110,7 +116,7 @@
 - 代码改动小步提交，提交信息说明行为变化；
 - 长时间任务每 30-60 秒汇报一次状态，遇到模型名、数据 license、显存或 benchmark schema 不确定时先报告，不自行编造。
 
-八、完成标准
+九、完成标准
 
 当且仅当以下条件满足，才说“最小实现完成”：
 

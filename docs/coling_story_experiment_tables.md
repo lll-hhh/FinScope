@@ -4,7 +4,7 @@
 
 ### 重跑状态（Qwen 小模型本地 Agent）
 
-此前表中的全年 Qwen3.8-27B 数字来自 deterministic local-agent 版本，只保留为 preliminary engineering reference；不能当作本地小模型最终结果。新协议固定 Qwen3.8-27B 为任务模型，另用 Qwen3.5 小模型承担本地识别、规划和审计，并在严格模式下禁止整套 fallback。当前 Qwen3.5-2B 已通过双资产三角色 toy smoke 和 11 资产单交易日 NLPCC pipeline smoke；这不是全年统计，主表的全年单元仍保持 `TBD`。全年重跑曾在第一个交易日遭遇任务模型 endpoint timeout，已记录为运行故障，恢复后必须从兼容 checkpoint 重新开始。0.8B 仅作 size ablation，4B/9B 作为候选主方法模型逐一验证。
+此前表中的全年 Qwen3.8-27B 数字来自 deterministic local-agent 版本，只保留为 preliminary engineering reference；不能当作本地小模型最终结果。新协议固定 Qwen3.8-27B 为任务模型，另用不超过 4B 的本地小模型承担识别、规划和审计，并在严格模式下禁止整套 fallback。当前 Qwen3.5-2B 已通过双资产三角色 toy smoke 和 11 资产单交易日 NLPCC pipeline smoke；这不是全年统计，主表的全年单元仍保持 `TBD`。全年重跑曾在第一个交易日遭遇任务模型 endpoint timeout，已记录为运行故障，恢复后必须从兼容 checkpoint 重新开始。正式候选固定为 `benchmarks/local_privacy_models.json` 中的 10 个模型。
 
 ## 1. 论文定位
 
@@ -288,7 +288,7 @@ Deletion 的零回撤不是优势，而是从未执行交易。正文不能将�
 
 P1-P5 的具体字段定义应在论文方法表中固定，测试集上不能根据收益反向挑选等级。Adaptive 必须仅在开发集标定。
 
-### Table 6: 恢复鲁棒性与故障注入
+### Table 6: 恢复鲁棒性与故障注入（工程诊断，不进入论文）
 
 | Perturbation | Exact Restore ↑ | Correct Reject ↑ | Unsafe Repair ↓ |
 | --- | ---: | ---: | ---: |
@@ -302,50 +302,57 @@ P1-P5 的具体字段定义应在论文方法表中固定，测试集上不能�
 | Out-of-range amount/weight | 0.0% | 100.0% | 0.0% |
 | Tool schema drift | TBD | TBD | TBD |
 
-单元测试只证明预期的软件分支，不应作为论文百分比。正式实验应从真实模型输出生成扰动，并保留可判定的 ground truth。
+这些数字来自当前回归/trace 诊断，部分使用受控 portfolio；它们只用于发现实现错误，不应作为论文百分比。正式论文结果必须使用 Table 11 S4 的真实模型输出、真实 portfolio state 和 NLPCC action replay。
 
-### Table 7: Privacy Agent 消融
+### Table 7: NLPCC 机制消融（正式 trace，不使用 toy case）
 
-| Variant | Sharpe ↑ | ReID@1 ↓ | Unsafe Repair ↓ |
-| --- | ---: | ---: | ---: |
-| Full FinScope | 2.976 | 53.20% | 0.0% |
-| - semantic descriptors, handles only | TBD | TBD | TBD |
-| - scope rotation | TBD | TBD | TBD |
-| - security-master validation | TBD | TBD | TBD |
-| - restoration auditor | TBD | TBD | TBD |
-| - coreference reuse | TBD | TBD | TBD |
-| Always scan | TBD | TBD | TBD |
-| Gated scan | TBD | TBD | TBD |
-| - task cache | TBD | TBD | TBD |
+任务模型、2025 NLPCC A-set、候选池、P3、公开侧信息攻击器和测试窗口全部固定；每个变体都重放真实交易日并生成匿名 trace。该表只保留能直接解释 B1 主线的机制变量。
 
-### Table 10: 本地隐私小模型消融（先在 NLPCC 上固定任务模型）
+| Variant | Sharpe ↑ | Valid ↑ | ReID@1 ↓ | Link AUC →.5 | Exact Restore ↑ | Unsafe Repair ↓ | E2E p95 ↓ |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Full FinScope P3 | 2.976 | 100.00% | 53.20% | 0.789 | 100.00% | 0.00% | 7.031 s |
+| Episode-scoped opaque alias | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| Handles only + scope rotation | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| FinScope without security-master validation | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| FinScope without restoration auditor | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
 
-任务模型固定为 Qwen3.8-27B，数据、候选池、P3 策略和攻击器固定；只替换本地 Privacy Agent 模型。严格模式禁止整套 deterministic fallback，字段选择错误可由 security master 做字段级规范化，并单独计入 `planner_repairs`。
+这不是把每个内部开关都做成探针；每一行都对应一个论文解释：语义是否必要、生命周期是否必要、事实验证是否必要、审计是否必要。always-scan/cache 命中等纯成本开关只保留在运行 artifact 和附录。
 
-| Local privacy model | Size | Strict planner valid ↑ | Planner repair rate ↓ | Recognizer failure ↓ | Auditor failure ↓ | Fallback count ↓ | Privacy-agent token Δ ↓ | Privacy-agent p95 ↓ | NLPCC Valid ↑ | Sharpe ↑ | Status |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| Qwen3.5-0.8B | 0.8B | **0% (0/1)** | -- | -- | -- | **1 strict rejection** | 1,276 prompt + 452 completion tok. | 11.2 s / 4 calls | -- | -- | **Measured: strict two-asset smoke failed at planner** |
-| Qwen3.5-2B | 2B | **100% (11/11)** | **100% (11/11)** | **0%** | **0%** | **0** | **+18,662 tok** | **118.7 s** | **100% (1/1 day)** | -- | **Measured: NLPCC one-day full pipeline** |
-| Qwen3.5-4B | 4B | 100% (11/11) toy | 100% toy | 0% toy | 0% toy | 0 toy | 1,562 tok / 5 calls toy | 7.7 s toy | TBD | TBD | candidate; real-payload run remains unstable under residual-scan load |
-| Qwen3.5-9B | 9B | TBD | TBD | TBD | TBD | **not allowed** | TBD | TBD | TBD | TBD | candidate if GPU budget permits |
-| Qwen3.5-27B | 27B | reference only | reference only | reference only | reference only | **not allowed** | TBD | TBD | TBD | TBD | task-model-sized upper bound, not final local agent |
+### Table 10: 本地隐私小模型正式消融（NLPCC 单平台，10 个模型，均 ≤4B）
 
-主方法从这张表中按预注册规则选择：首先满足 planner/recognizer/auditor 严格成功率和零 fallback，再在 NLPCC 开发日上比较金融效用与本地成本；不能看测试集 Sharpe 后反选。0.8B/2B 的失败记录保留在 artifact，不能写成“1B 最终结果”。
+任务模型固定为 Qwen3.8-27B；使用官方 NLPCC 2026 Track 1 public A-set，按时间顺序固定前 20 个交易日为开发集，其余交易日为测试集。10 个 instruction-tuned 本地模型共用同一 JSON 协议、P3、候选池、调用预算和三个角色（recognizer/planner/auditor）。严格模式禁止整套 deterministic fallback；字段级安全规范化单独计入 `planner_repairs`。
 
-小模型表中的指标含义：`Strict planner valid` 是每个资产是否在不使用整套 deterministic fallback 的情况下产出可验证 P1-P5 计划；`Planner repair rate` 是模型选出字段后，由主表对字段表面做的安全规范化比例，不表示模型完全正确；`Recognizer failure` 和 `Auditor failure` 分别是 JSON span/审计响应解析失败率；`Fallback count` 在严格最终实验中必须为 0；`Privacy-agent token Δ` 和 `p95` 只计算本地隐私 Agent 的额外调用，不把 Qwen3.8-27B 任务模型 token 混进来；`NLPCC Valid` 和 `Sharpe` 只有完成正式测试窗口后才可填写，单日 smoke 不报告 Sharpe。
+模型清单和下载状态见 [`benchmarks/local_privacy_models.json`](../benchmarks/local_privacy_models.json)。
 
-### Table 11: B1 完整性实验（3--4 个必须完成）
+| Local privacy model | Size | Family / era | Dev strict planner valid ↑ | Recognizer failure ↓ | Auditor failure ↓ | Fallback count ↓ | Privacy-agent p95 ↓ | Dev NLPCC Valid ↑ | Dev Sharpe ↑ | Availability |
+| --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| Qwen3.5-0.8B | 0.8B | Qwen3.5 / 2026 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | ready |
+| Qwen3.5-2B | 2B | Qwen3.5 / 2026 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | ready |
+| Qwen3.5-4B | 4B | Qwen3.5 / 2026 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | ready |
+| Qwen3-0.6B | 0.6B | Qwen3 / 2025 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | download required |
+| Qwen3-1.7B | 1.7B | Qwen3 / 2025 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | download required |
+| Llama-3.2-1B-Instruct | 1B | Llama 3.2 / 2024 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | ready |
+| Llama-3.2-3B-Instruct | 3B | Llama 3.2 / 2024 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | ready |
+| Gemma-3-1B-it | 1B | Gemma 3 / 2025 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | ready |
+| Gemma-3-4B-it | 4B | Gemma 3 / 2025 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | ready |
+| Phi-4-mini-instruct | 3.8B | Phi-4 / 2025 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | download required |
 
-| Experiment | Controlled change | Primary report | Why it is needed |
-| --- | --- | --- | --- |
-| Scope rotation | same task across adjacent trading days | stale-handle reject rate, cross-day Link AUC | 证明句柄生命周期而非字符串替换 |
-| Recovery fault injection | truncate/fabricate/swap/old handle、非法金额、schema drift | Exact Restore, Correct Reject, Unsafe Repair | 证明恢复和交易前 fail-closed |
-| Disclosure frontier | P1/P2/P3/P4/P5 with same task model | Sharpe, ReID@1, Link AUC | 证明语义披露—效用前沿 |
-| Attacker strength | oracle vs same-base Qwen attacker, query budget 1/3/5/10 | ReID@1, Holding/Action F1, Link AUC | 排除“攻击器太弱”解释 |
+预注册选择规则：先要求严格 planner valid ≥99%、recognizer/auditor failure = 0、fallback = 0；满足者中优先本地 p95 和 token 更低者，再检查开发集 NLPCC Valid。开发集只用于选主方法，测试集不能反选。当前已有的双资产和单日 smoke 只用于排查服务，不填入这张正式表，也不作为论文百分比。
 
-同底座 LLM attacker 仅作为攻击强度补充实验：Qwen3.8-27B victim 配 Qwen3.8-27B attacker，二者独立上下文和调用统计；主表继续使用公开侧信息 oracle，FinVault 继续使用 Benchmark 自带攻击提示。
+小模型指标含义：`Dev strict planner valid` 是每个真实资产在无整套 fallback 时产生可验证计划的比例；`Recognizer/Auditor failure` 是 JSON 解析或语义审计失败率；`Fallback count` 必须为零；`Privacy-agent p95` 只统计本地 Agent 三角色额外调用；`Dev NLPCC Valid/Sharpe` 是真实开发窗口的 Benchmark 原生结果。
 
-最关键的两项是 Episode Alias 与 `handles only`。它们用于证明收益来自受验证语义，而隐私与连续性来自生命周期和恢复机制，而不是某一个字符串格式。
+### Table 11: NLPCC 单平台 B1 完整性实验（4 项正式补充）
+
+以下实验都使用同一 NLPCC 2026 Track 1 public A-set、官方 DataLoader、同一 Qwen3.8-27B 任务模型和 Table 10 选出的本地模型。除非明确写出开发集，所有数字均来自未参与模型选择的测试交易日；不使用双资产 toy、静态伪造输入或单元测试百分比。
+
+| ID | Formal protocol on NLPCC | Controlled change | Primary report | B1 claim |
+| --- | --- | --- | --- | --- |
+| S1 | 10-model local Agent ablation on fixed 20-day development prefix; selected model replayed on held-out days | only local recognizer/planner/auditor model changes | strict validity, failures, fallback, local p95/token, Valid, Sharpe | 本地小模型足以承担隐私 Agent，且选择不依赖测试收益 |
+| S2 | Full held-out daily replay at P1/P2/P3/P4/P5 with selected model | only disclosure level changes | Sharpe, Return, MDD, ReID@1, Link AUC, Exact Restore, Unsafe Repair | 语义披露形成可量化隐私—效用前沿 |
+| S3 | Three logical roles (research/risk/trade) share a scope within each day and rotate at day boundary; replay real candidate/news/action traces | global alias vs episode alias vs FinScope lifecycle | same-day cross-role binding consistency, stale-handle rejection, cross-day Link AUC, workflow completion | 生命周期绑定支持多 Agent 连续协作而非只替换字符串 |
+| S4 | Inject faults into accepted real FinScope outputs and replay the corresponding NLPCC action at its recorded portfolio state | clean output vs truncated/forged/stale/swapped/schema/numeric faults | Exact Restore, Correct Reject, Unsafe Repair, State Equivalence, execution interruption | 恢复是交易前安全边界，异常结果 fail-closed |
+
+S3 的攻击仍使用公开证券主表/行情属性 oracle；S4 必须从真实模型输出和真实 portfolio trace 生成扰动。当前脚本中的 synthetic portfolio、双资产 smoke 和单元测试只能作为工程回归，不得替代 S3/S4 的正式结果。攻击模型能力敏感性不再列为必做主补充表，必要时放入附录。
 
 ### Table 8: 成本与延迟（Measured）
 
@@ -360,7 +367,7 @@ P1-P5 的具体字段定义应在论文方法表中固定，测试集上不能�
 
 本表只报告读者最容易解释的 token 增量和端到端尾延迟。detector/planner/auditor 调用次数、cache hit、probe、峰值显存、API 金额和 GPU 能耗保留在机器可读 artifact；仅在成本异常或审稿人要求时进入附录。
 
-### Table 9: 攻击强度与累计泄露
+### Table 9: 攻击强度与累计泄露（附录敏感性，不是必做补充）
 
 | Setting | Values | ReID@1 ↓ | Link AUC →.5 |
 | --- | --- | ---: | ---: |
@@ -370,25 +377,26 @@ P1-P5 的具体字段定义应在论文方法表中固定，测试集上不能�
 | Public side info | none / news / news+prices | TBD | TBD |
 | Attack model | Qwen / DeepSeek / GLM | TBD | TBD |
 
+Table 11 的四项 NLPCC 补充不依赖这张敏感性表；只有在 S1-S4 完成后仍有时间和预算，才按固定攻击预算补跑。不能用这里的 TBD 或 toy 攻击替代主结果。
+
 ## 6. 实验执行清单
 
 ### P0: 论文主张成立前必须完成
 
 1. 实现并运行 Episode Alias 强基线，修正 baseline 命名。
 2. 实现同基座 LLM Rewrite，并将额外调用、token、延迟和事实漂移计入。
-3. 先完成 NLPCC 上 Qwen3.5-0.8B/2B/4B/9B 本地隐私模型消融，选出满足严格成功率约束的主方法模型。
-4. 用选定的小模型完成 Qwen3.8-27B x NLPCC 的六方法全量重跑，再扩展到 StockBench/FinVault。
-5. 建立本地 attack ground truth，运行 ReID、Pool/Holding recovery、Action inference 和 Link AUC。
-6. 运行真实 trace 驱动的恢复故障注入，正式统计 Exact Restore、State Equivalence 和 Unsafe Repair。
-7. 为主要 rate 报告 95% CI；金融序列采用 paired moving-block bootstrap，不能把 243 个交易日当独立样本做普通 t-test。
+3. 按 `benchmarks/local_privacy_models.json` 在 NLPCC 固定开发窗口跑完 10 个 ≤4B 本地模型，按预注册规则锁定主方法模型。
+4. 用锁定的小模型完成 Qwen3.8-27B x NLPCC 的六方法全量重放，再决定是否扩展到 StockBench/FinVault。
+5. 建立本地 attack ground truth，运行公开侧信息 ReID、候选池/持仓恢复、动作推断和 Link AUC。
+6. 完成 Table 11 的 S2-S4：P1-P5 测试集前沿、三角色作用域回放、真实 portfolio trace 故障注入。
+7. 为主要 rate 报告 95% CI；金融序列采用 paired moving-block bootstrap，不能把交易日当独立样本做普通 t-test。
 
 ### P1: COLING 完整性所需
 
-8. 接入 StockBench 和 FinVault，完成 Qwen3.8-27B 的主表，再补 DeepSeek/GLM。
-9. 运行 P1-P5 与 Adaptive，给出隐私-效用 Pareto 曲线。
-10. 完成核心消融：handles-only、无轮换、无 security master、无 auditor、always-scan、无 cache。
-11. 补充候选池规模、查询预算、公开 side information 和跨 Agent 聚合攻击。
-12. 记录 detector/planner/auditor 调用、缓存、probe、GPU 显存/能耗和 API 成本。
+8. 在 NLPCC 主平台完成 Table 7 的四个机制变体和 Table 11 的四项正式补充。
+9. 运行 Adaptive，并只在开发集标定、测试集报告。
+10. 记录 detector/planner/auditor 调用、缓存、probe、GPU 显存/能耗和 API 成本。
+11. 只有 S1-S4 完成后，才把同一协议迁移到 StockBench/FinVault；迁移结果单独成表，不与 NLPCC 硬平均。
 
 ### P2: 增强说服力
 

@@ -241,7 +241,9 @@ FAL（Financial Association Leakage）可以作为报告总称，但在定义权
 - FinScope without security-master validation；
 - FinScope without coreference reuse；
 - static privacy vs adaptive privacy；
-- 0.6B detector 与更大 detector 的准确率/时延比较（资源允许时）。
+- `benchmarks/local_privacy_models.json` 中的 10 个 ≤4B instruction-tuned 本地模型：Qwen3.5-0.8B/2B/4B、Qwen3-0.6B/1.7B、Llama-3.2-1B/3B-Instruct、Gemma-3-1B/4B-it 和 Phi-4-mini-instruct。
+
+本地模型消融和 B1 完整性补充统一固定在 NLPCC 2026 Track 1 public A-set：前 20 个交易日用于模型选择和 Adaptive 标定，剩余交易日用于正式报告；任务模型固定为 Qwen3.8-27B。正式补充只包括 10-model 消融、P1-P5 披露前沿、research/risk/trade 三角色作用域回放和真实 portfolio trace 恢复故障注入。双资产 smoke、synthetic portfolio 和单元测试不作为论文证据。
 
 需要隔离的变量包括：代号轮换范围、资产/动作/关系的保护等级、删除/替换/泛化策略、攻击强度、重试次数、候选池规模、基座模型和扫描门控模式。
 
@@ -251,7 +253,7 @@ FAL（Financial Association Leakage）可以作为报告总称，但在定义权
 - 尚未在完整 NLPCC LFS 数据上跑出金融收益结果；
 - 尚未完成候选池扩大后的攻击 ground truth 和统一 FAL 标定；
 - 当前映射主要在内存中，生产部署仍需本地加密存储、密钥生命周期和崩溃恢复设计；
-- 当前 0.6B recognizer 需要真实中文金融残余 span 数据做准确率、漏检和误报评估；
+- 10 个本地隐私模型都需要真实中文金融残余 span 数据做准确率、漏检和误报评估；当前只有 Qwen3.5-2B 有单日 pipeline smoke，不能替代正式开发集比较；
 - 企业网关中的 DeepSeek/GLM 实际模型 alias 尚需在实验服务器核验；
 - “公开新闻是否直接含 ETF 代码/名称”的覆盖率必须在拉取 LFS 后实测，不能凭文件名推断。
 
@@ -259,7 +261,7 @@ FAL（Financial Association Leakage）可以作为报告总称，但在定义权
 
 1. 审计新服务器 GPU、CUDA、Python、磁盘、Git LFS 和模型缓存；
 2. 克隆本仓库，运行现有 33 项测试；
-3. 核验用户给出的 Qwen 27B 实际模型 ID，明确基座模型与 0.6B detector 的部署分工；
+3. 核验用户给出的 Qwen 27B 实际模型 ID，明确基座模型与 10 个 ≤4B 本地隐私模型的部署分工；
 4. 拉取 NLPCC LFS 数据，核验真实文件、日期、新闻覆盖、候选池和许可；
 5. 先用一个交易日、一个 Agent、少量候选资产完成 Vanilla -> sanitize -> 外部 LLM -> restore -> validate -> backtest smoke；
 6. 再接入 TradingAgents 的研究/风险/交易节点，统一 scope 和 trace schema；
