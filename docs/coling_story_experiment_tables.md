@@ -324,7 +324,7 @@ P1-P5 的具体字段定义应在论文方法表中固定，测试集上不能�
 
 | Local privacy model | Size | Strict planner valid ↑ | Planner repair rate ↓ | Recognizer failure ↓ | Auditor failure ↓ | Fallback count ↓ | Privacy-agent token Δ ↓ | Privacy-agent p95 ↓ | NLPCC Valid ↑ | Sharpe ↑ | Status |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| Qwen3.5-0.8B | 0.8B | TBD | TBD | TBD | TBD | **not allowed** | TBD | TBD | TBD | TBD | strict role smoke failed; size ablation only |
+| Qwen3.5-0.8B | 0.8B | **0% (0/1)** | -- | -- | -- | **1 strict rejection** | 1,276 prompt + 452 completion tok. | 11.2 s / 4 calls | -- | -- | **Measured: strict two-asset smoke failed at planner** |
 | Qwen3.5-2B | 2B | **100% (11/11)** | **100% (11/11)** | **0%** | **0%** | **0** | **+18,662 tok** | **118.7 s** | **100% (1/1 day)** | -- | **Measured: NLPCC one-day full pipeline** |
 | Qwen3.5-4B | 4B | 100% (11/11) toy | 100% toy | 0% toy | 0% toy | 0 toy | 1,562 tok / 5 calls toy | 7.7 s toy | TBD | TBD | candidate; real-payload run remains unstable under residual-scan load |
 | Qwen3.5-9B | 9B | TBD | TBD | TBD | TBD | **not allowed** | TBD | TBD | TBD | TBD | candidate if GPU budget permits |
