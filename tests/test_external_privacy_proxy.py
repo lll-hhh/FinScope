@@ -117,6 +117,22 @@ class ExternalPrivacyProxyTests(unittest.TestCase):
             self.assertNotIn("finscope_episode", outbound)
             self.assertNotIn("finscope_role", outbound)
 
+    def test_llm_rewrite_audits_identity_exposure_to_rewriter(self):
+        with tempfile.TemporaryDirectory() as directory:
+            controller = PrivacyController(
+                config("llm_rewrite", Path(directory) / "audit.jsonl"),
+                stockbench_catalog(),
+            )
+            controller._post = lambda _payload: {
+                "choices": [{"message": {"content": "technology stock"}}],
+                "usage": {"total_tokens": 10},
+            }
+            _, metadata = controller.rewrite_messages(
+                {"messages": [{"role": "user", "content": "Analyze AAPL"}]}
+            )
+            self.assertEqual(metadata["status"], "ok")
+            self.assertEqual(metadata["outbound_sensitive"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()

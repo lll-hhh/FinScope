@@ -461,7 +461,12 @@ class PrivacyController:
         }
         generalized = self.catalog.replace(messages, replacements)
         if not isinstance(generalized, list):
-            return [], {"status": "fallback", "usage": {}, "latency_ms": 0.0}
+            return [], {
+                "status": "fallback",
+                "usage": {},
+                "latency_ms": 0.0,
+                "outbound_sensitive": 0,
+            }
         latest = None
         if isinstance(messages, list):
             for index in range(len(messages) - 1, -1, -1):
@@ -470,7 +475,12 @@ class PrivacyController:
                     latest = index
                     break
         if latest is None:
-            return generalized, {"status": "no_user", "usage": {}, "latency_ms": 0.0}
+            return generalized, {
+                "status": "no_user",
+                "usage": {},
+                "latency_ms": 0.0,
+                "outbound_sensitive": 0,
+            }
         original = messages[latest].get("content", "")
         prompt = (
             "Rewrite the following financial-agent message to remove or generalize all "
@@ -501,6 +511,7 @@ class PrivacyController:
                 "status": "ok",
                 "usage": response.get("usage", {}),
                 "latency_ms": (time.perf_counter() - started) * 1000,
+                "outbound_sensitive": self.catalog.count(original),
             }
         except Exception as exc:
             return generalized, {
@@ -508,6 +519,7 @@ class PrivacyController:
                 "error": str(exc)[:200],
                 "usage": {},
                 "latency_ms": (time.perf_counter() - started) * 1000,
+                "outbound_sensitive": self.catalog.count(original),
             }
 
     def _post(self, payload: Dict[str, Any]) -> Dict[str, Any]:

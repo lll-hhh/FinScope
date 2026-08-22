@@ -66,6 +66,14 @@ def summarize_audit(path: Path) -> Dict[str, Any] | None:
         "request_success_rate": len(successful) / len(rows),
         "input_sensitive_mentions": sum(int(row.get("input_sensitive", 0)) for row in rows),
         "outbound_sensitive_mentions": sum(int(row.get("outbound_sensitive", 0)) for row in rows),
+        "rewrite_outbound_sensitive_mentions": sum(
+            int((row.get("rewrite") or {}).get("outbound_sensitive", 0)) for row in rows
+        ),
+        "all_external_sensitive_mentions": sum(
+            int(row.get("outbound_sensitive", 0))
+            + int((row.get("rewrite") or {}).get("outbound_sensitive", 0))
+            for row in rows
+        ),
         "upstream_sensitive_mentions": sum(int(row.get("upstream_sensitive", 0)) for row in rows),
         "task_tokens": sum(usage_total(row.get("task_usage")) for row in successful),
         "rewrite_tokens": sum(
