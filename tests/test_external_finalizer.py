@@ -18,15 +18,16 @@ class ExternalFinalizerTests(unittest.TestCase):
             },
             "privacy": {"reid_at_1": 0.05, "link_auc": 1.0},
             "audit": {
-                "exact_restore_rate": 1.0,
-                "unsafe_repair_rate": 0.0,
+                "exact_action_restore_rate": 1.0,
                 "e2e_p95_ms": 2500,
             },
+            "decision_preservation": {"rate": 0.9},
+            "reference_continuity": {"episode_rate": 1.0},
             "token_delta_vs_vanilla": 0.1,
         }
         value = row_text(row)
         self.assertIn("| StockBench | Qwen3.8-27B | Global Alias |", value)
-        self.assertIn("| 100.00% | 0.00% | +10.0% | 2.500 s |", value)
+        self.assertIn("| 90.00% | 100.00% | 100.00% | 5.00% | 1.000 | +10.0% | 2.500 s |", value)
 
 
 if __name__ == "__main__":

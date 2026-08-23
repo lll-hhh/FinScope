@@ -3,7 +3,12 @@ from __future__ import annotations
 import unittest
 
 from benchmarks.serve_privacy_proxy import stockbench_catalog
-from benchmarks.summarize_external_matrix import catalog_privacy_attack, percentile
+from benchmarks.summarize_external_matrix import (
+    catalog_privacy_attack,
+    decision_preservation_from_audits,
+    percentile,
+    reference_continuity_from_audits,
+)
 
 
 class ExternalSummaryTests(unittest.TestCase):
@@ -24,6 +29,40 @@ class ExternalSummaryTests(unittest.TestCase):
         result = catalog_privacy_attack(stockbench_catalog(), "vanilla")
         self.assertEqual(result["reid_at_1"], 1.0)
         self.assertEqual(result["link_auc"], 1.0)
+
+    def test_external_audit_closed_loop_metrics(self):
+        vanilla = [
+            {
+                "status": "ok",
+                "episode_id": "day-1",
+                "role": "research",
+                "input_fingerprint": "input-1",
+                "decision_fingerprint": "decision-a",
+            }
+        ]
+        protected = [
+            {
+                **vanilla[0],
+                "bindings": [
+                    {"canonical_id": "AAPL", "alias": "EA_ASSET_1"}
+                ],
+            },
+            {
+                "status": "ok",
+                "episode_id": "day-1",
+                "role": "trade",
+                "input_fingerprint": "input-2",
+                "decision_fingerprint": "decision-b",
+                "bindings": [
+                    {"canonical_id": "AAPL", "alias": "EA_ASSET_1"}
+                ],
+            },
+        ]
+        decision = decision_preservation_from_audits(protected[:1], vanilla)
+        continuity = reference_continuity_from_audits(protected)
+        self.assertEqual(decision["rate"], 1.0)
+        self.assertEqual(continuity["episode_rate"], 1.0)
+        self.assertEqual(continuity["asset_rate"], 1.0)
 
 
 if __name__ == "__main__":

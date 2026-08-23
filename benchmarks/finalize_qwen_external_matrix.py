@@ -27,6 +27,10 @@ def number(value: Any) -> str:
     return f"{float(value):.3f}"
 
 
+def optional_percent(value: Any, *, missing: str = "TBD") -> str:
+    return missing if value is None else percent(value)
+
+
 def row_text(row: Mapping[str, Any]) -> str:
     benchmark = str(row["benchmark"])
     method = str(row["method"])
@@ -49,12 +53,28 @@ def row_text(row: Mapping[str, Any]) -> str:
         ]
     else:
         raise ValueError(f"unsupported benchmark: {benchmark}")
-    if method in {"global_alias", "episode_alias", "finscope"}:
-        exact = percent(audit["exact_restore_rate"])
-        unsafe = percent(audit["unsafe_repair_rate"])
+    decision = row.get("decision_preservation")
+    decision_rate = (
+        None if not isinstance(decision, Mapping) else decision.get("rate")
+    )
+    continuity = row.get("reference_continuity")
+    continuity_rate = (
+        None if not isinstance(continuity, Mapping) else continuity.get("episode_rate")
+    )
+    if method == "vanilla":
+        decision_cell = "ref."
     else:
-        exact = "--"
-        unsafe = "--"
+        decision_cell = optional_percent(decision_rate)
+    continuity_cell = (
+        "--"
+        if method in {"vanilla", "deletion", "llm_rewrite"} and continuity_rate is None
+        else optional_percent(continuity_rate, missing="N/A")
+    )
+    exact_action = audit.get("exact_action_restore_rate")
+    exact_action_cell = (
+        "--" if method in {"vanilla", "deletion", "llm_rewrite"} and exact_action is None
+        else optional_percent(exact_action)
+    )
     delta = row.get("token_delta_vs_vanilla")
     token_delta = "ref." if method == "vanilla" else f"{100 * float(delta):+.1f}%"
     cells = [
@@ -62,10 +82,11 @@ def row_text(row: Mapping[str, Any]) -> str:
         "Qwen3.8-27B",
         METHOD_LABELS[method],
         *native_cells,
+        decision_cell,
+        continuity_cell,
+        exact_action_cell,
         percent(privacy["reid_at_1"]),
         number(privacy["link_auc"]),
-        exact,
-        unsafe,
         token_delta,
         f"{float(audit['e2e_p95_ms']) / 1000:.3f} s",
     ]

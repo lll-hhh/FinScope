@@ -35,6 +35,11 @@ from benchmarks.local_privacy_agent import (
     build_model_assisted_agent,
     usage_delta,
 )
+from benchmarks.closed_loop_metrics import (
+    decision_preservation,
+    exact_action_restore,
+    reference_continuity,
+)
 
 
 METHODS = (
@@ -168,6 +173,13 @@ class DayRecord:
     rewrite_succeeded: Optional[bool] = None
     privacy_model_usage: Dict[str, float] = field(default_factory=dict)
     privacy_agent_metrics: Dict[str, int] = field(default_factory=dict)
+    # These are episode-level closed-loop measures.  They are optional so
+    # older checkpoints remain readable and methods without a restoration
+    # boundary can be reported as N/A rather than as a fabricated zero.
+    reference_continuity: Optional[bool] = None
+    reference_comparable_assets: int = 0
+    reference_view_count: int = 0
+    exact_action_restore: Optional[bool] = None
 
 
 def parse_args() -> argparse.Namespace:
@@ -744,6 +756,102 @@ def restore_and_validate(
         return restored, False, str(exc)
 
 
+_ASSET_ALIAS_PATTERN = re.compile(
+    r"(?<![A-Za-z0-9_])(?:FS_ASSET_[A-Z2-9]{8}|"
+    r"(?:FIXED|EP)_ASSET_[A-Z0-9_]+)(?![A-Za-z0-9_])",
+    re.IGNORECASE,
+)
+
+
+def _asset_token(value: Any) -> Optional[str]:
+    """Extract a local asset handle from a raw field or FinScope wrapper."""
+
+    if not isinstance(value, str):
+        return None
+    match = _ASSET_ALIAS_PATTERN.search(value)
+    return match.group(0).upper() if match else value.strip()
+
+
+def _asset_resolver(
+    method: str,
+    scope: Optional[Any],
+    privacy_agent: LocalPrivacyAgent,
+    alias_restore: Mapping[str, str],
+) -> Dict[str, str]:
+    """Return the evaluator-only handle -> canonical asset mapping."""
+
+    if method == "finscope" and scope is not None:
+        local = privacy_agent.mediator.get_local_mapping(scope)
+        resolved: Dict[str, str] = {}
+        for alias, canonical in local.items():
+            value = str(canonical)
+            value = CANONICAL_ASSET.get(value.casefold(), value)
+            if value in FUND_POOL:
+                resolved[str(alias).upper()] = value
+        return resolved
+    return {
+        str(alias).upper(): str(canonical)
+        for alias, canonical in alias_restore.items()
+        if str(canonical) in FUND_POOL
+    }
+
+
+def _resolve_asset_field(value: Any, resolver: Mapping[str, str]) -> Optional[str]:
+    token = _asset_token(value)
+    if not token:
+        return None
+    canonical = resolver.get(token.upper())
+    if canonical is not None:
+        return canonical
+    return CANONICAL_ASSET.get(token.casefold())
+
+
+def _reference_views(
+    outbound: Mapping[str, Any],
+    outbound_action: Optional[Mapping[str, Any]],
+    resolver: Mapping[str, str],
+) -> Dict[str, Dict[str, str]]:
+    """Build local research/risk/trade views from one NLPCC episode.
+
+    NLPCC exposes one daily decision call rather than three independent
+    Agent endpoints.  The three views are therefore the candidate/news side,
+    portfolio-risk side, and returned trade action.  This is an honest
+    episode-level continuity check; StockBench/FinVault role logs use the same
+    helper over their actual role requests.
+    """
+
+    views: Dict[str, Dict[str, str]] = {
+        "research": {},
+        "risk": {},
+        "trade": {},
+    }
+    for candidate in outbound.get("candidate_pool", ()):
+        if not isinstance(candidate, Mapping):
+            continue
+        raw = candidate.get("asset")
+        canonical = _resolve_asset_field(raw, resolver)
+        token = _asset_token(raw)
+        if canonical is not None and token:
+            views["research"][canonical] = token
+    portfolio = outbound.get("portfolio", {})
+    holdings = portfolio.get("holdings", ()) if isinstance(portfolio, Mapping) else ()
+    for holding in holdings:
+        if not isinstance(holding, Mapping):
+            continue
+        raw = holding.get("asset")
+        canonical = _resolve_asset_field(raw, resolver)
+        token = _asset_token(raw)
+        if canonical is not None and token:
+            views["risk"][canonical] = token
+    if isinstance(outbound_action, Mapping):
+        raw = outbound_action.get("asset")
+        canonical = _resolve_asset_field(raw, resolver)
+        token = _asset_token(raw)
+        if canonical is not None and token:
+            views["trade"][canonical] = token
+    return views
+
+
 def mark_to_market(portfolio: Portfolio, prices: Mapping[str, Mapping[str, Any]]) -> None:
     for asset, value in portfolio.holdings.items():
         if value <= 0:
@@ -843,7 +951,6 @@ def summarize(
                     and current_counts[current[asset]] == 1
                 )
         weight_errors = []
-        decision_matches = []
         for row in rows:
             vanilla = vanilla_rows.get(row.date)
             if vanilla is None:
@@ -852,25 +959,56 @@ def summarize(
                 abs(row.portfolio_weights.get(asset, 0.0) - vanilla.portfolio_weights.get(asset, 0.0))
                 for asset in FUND_POOL
             )
-            current_action = row.restored_action or {}
-            vanilla_action = vanilla.restored_action or {}
-            decision_matches.append(
-                row.valid
-                and vanilla.valid
-                and current_action.get("asset") == vanilla_action.get("asset")
-                and current_action.get("action") == vanilla_action.get("action")
-            )
+        decision = decision_preservation(
+            [
+                {
+                    "episode_id": row.date,
+                    "action": row.restored_action,
+                    "valid": row.valid,
+                }
+                for row in rows
+            ],
+            [
+                {
+                    "episode_id": row.date,
+                    "action": row.restored_action,
+                    "valid": row.valid,
+                }
+                for row in vanilla_rows.values()
+            ],
+        )
+        continuity_rows = [
+            row for row in rows if row.reference_continuity is not None
+        ]
+        continuity_rate = (
+            statistics.mean(bool(row.reference_continuity) for row in continuity_rows)
+            if continuity_rows
+            else None
+        )
+        exact_rows = [row for row in rows if row.exact_action_restore is not None]
+        exact_rate = (
+            statistics.mean(bool(row.exact_action_restore) for row in exact_rows)
+            if exact_rows
+            else None
+        )
         table.append(
             {
                 "method": method,
                 **perf,
-                "valid_action_rate": sum(row.valid for row in rows) / len(rows),
-                "execution_success_rate": sum(row.executed for row in rows) / len(rows),
-                "decision_agreement_with_vanilla": (
-                    sum(decision_matches) / len(decision_matches)
-                    if decision_matches
-                    else 0.0
+                "valid_action_rate": sum(row.valid for row in rows) / len(rows) if rows else 0.0,
+                "execution_success_rate": sum(row.executed for row in rows) / len(rows) if rows else 0.0,
+                # Kept as a compatibility alias for older result consumers.
+                "decision_agreement_with_vanilla": decision["rate"] or 0.0,
+                "decision_preservation_rate": decision["rate"],
+                "decision_preserved_episodes": decision["preserved"],
+                "decision_comparable_episodes": decision["episodes"],
+                "reference_continuity_rate": continuity_rate,
+                "reference_continuity_episodes": len(continuity_rows),
+                "reference_comparable_assets": sum(
+                    row.reference_comparable_assets for row in continuity_rows
                 ),
+                "exact_action_restore_rate": exact_rate,
+                "exact_action_restore_episodes": len(exact_rows),
                 "portfolio_weight_mae_vs_vanilla": (
                     statistics.mean(weight_errors) if weight_errors else 0.0
                 ),
@@ -879,11 +1017,19 @@ def summarize(
                 )
                 / len(rows),
                 "cross_day_unique_link_rate": sum(links) / len(links) if links else 0.0,
-                "avg_input_tokens": statistics.mean(
-                    row.input_tokens + row.rewrite_input_tokens for row in rows
+                "avg_input_tokens": (
+                    statistics.mean(
+                        row.input_tokens + row.rewrite_input_tokens for row in rows
+                    )
+                    if rows
+                    else 0.0
                 ),
-                "avg_output_tokens": statistics.mean(
-                    row.output_tokens + row.rewrite_output_tokens for row in rows
+                "avg_output_tokens": (
+                    statistics.mean(
+                        row.output_tokens + row.rewrite_output_tokens for row in rows
+                    )
+                    if rows
+                    else 0.0
                 ),
                 "rewrite_success_rate": (
                     statistics.mean(
@@ -915,6 +1061,10 @@ def summarize(
 def render_markdown(result: Mapping[str, Any]) -> str:
     metadata = result["metadata"]
     model_name = Path(str(metadata["model"])).name
+
+    def rate(value: Optional[float]) -> str:
+        return "N/A" if value is None else f"{value:.1%}"
+
     lines = [
         "# Real NLPCC 2026 Track 1 Main Table",
         "",
@@ -925,28 +1075,25 @@ def render_markdown(result: Mapping[str, Any]) -> str:
         "current-day close/high/low/return hidden from prompts",
         "- Trading: CNY 100,000 initial capital, daily close execution, 0.01% friction",
         "",
-        "| Method | Return ↑ | Sharpe ↑ | Sortino ↑ | MDD ↓ | Turnover | Agree w/ Vanilla ↑ | Weight MAE ↓ | Valid ↑ | Executed ↑ | Direct leak ↓ | Cross-day link ↓ | In tok. ↓ | Local p95 ms ↓ | E2E p95 ms ↓ |",
-        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+        "| Method | Return ↑ | Sharpe ↑ | MDD ↓ | Valid ↑ | Decision Preservation ↑ | Reference Continuity ↑ | Exact Action Restore ↑ | Direct leak ↓ | Cross-day link ↓ | In tok. ↓ | E2E p95 ms ↓ |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
     for row in result["main_table"]:
         lines.append(
-            "| {method} | {ret:.2%} | {sharpe:.3f} | {sortino:.3f} | {mdd:.2%} | "
-            "{turnover:.3f} | {agree:.1%} | {weight_mae:.4f} | {valid:.1%} | {executed:.1%} | {leak:.1%} | "
-            "{link:.1%} | {tokens:.1f} | {local:.2f} | {e2e:.2f} |".format(
+            "| {method} | {ret:.2%} | {sharpe:.3f} | {mdd:.2%} | {valid:.1%} | "
+            "{decision} | {continuity} | {restore} | {leak:.1%} | {link:.1%} | "
+            "{tokens:.1f} | {e2e:.2f} |".format(
                 method=row["method"],
                 ret=row["total_return"],
                 sharpe=row["sharpe"],
-                sortino=row["sortino"],
                 mdd=row["max_drawdown"],
-                turnover=row["turnover_over_initial_capital"],
-                agree=row["decision_agreement_with_vanilla"],
-                weight_mae=row["portfolio_weight_mae_vs_vanilla"],
                 valid=row["valid_action_rate"],
-                executed=row["execution_success_rate"],
+                decision=rate(row.get("decision_preservation_rate")),
+                continuity=rate(row.get("reference_continuity_rate")),
+                restore=rate(row.get("exact_action_restore_rate")),
                 leak=row["direct_identifier_leak_rate"],
                 link=row["cross_day_unique_link_rate"],
                 tokens=row["avg_input_tokens"],
-                local=row["local_p95_ms"],
                 e2e=row["e2e_p95_ms"],
             )
         )
@@ -1295,6 +1442,27 @@ def run(args: argparse.Namespace) -> Dict[str, Any]:
                 executed, execution_rejection = execute_action(portfolio, restored)
                 if not executed:
                     rejection = execution_rejection
+            resolver = _asset_resolver(
+                method,
+                scope,
+                privacy_agent,
+                alias_restore,
+            )
+            views = _reference_views(outbound, outbound_action, resolver)
+            continuity = reference_continuity(views)
+            # Vanilla and deletion have no local restoration boundary.  Keep
+            # them out of the restore denominator rather than treating direct
+            # use or an unrecoverable deletion as a successful restore.
+            exact_restore = (
+                exact_action_restore(
+                    outbound_action,
+                    restored,
+                    resolver,
+                    executed=executed,
+                )
+                if method not in {"vanilla", "deletion"}
+                else None
+            )
             postprocess_ms = (time.perf_counter() - post_started) * 1000
             values[method].append(portfolio.value)
             records.append(
@@ -1331,6 +1499,14 @@ def run(args: argparse.Namespace) -> Dict[str, Any]:
                     rewrite_succeeded=rewrite_succeeded,
                     privacy_model_usage=privacy_model_usage,
                     privacy_agent_metrics=privacy_agent_metrics,
+                    reference_continuity=(
+                        bool(continuity["rate"] == 1.0)
+                        if continuity["rate"] is not None
+                        else None
+                    ),
+                    reference_comparable_assets=int(continuity["comparable_assets"]),
+                    reference_view_count=int(continuity["views"]),
+                    exact_action_restore=exact_restore,
                 )
             )
             if scope is not None:

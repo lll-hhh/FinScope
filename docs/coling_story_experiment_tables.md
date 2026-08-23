@@ -84,11 +84,15 @@ FinScope 是金融多智能体系统中新增的本地语义保障 Agent：
 
 ### FinScope 新增指标
 
-这一组回答“隐私层是否真正保护身份、能否安全恢复、代价多大”，必须与 Benchmark 原生分数分开报告：
+这一组不再把“恢复成功”当成一个笼统数字，而是把保护后闭环的三个关口分别量化，再加隐私和成本。它必须与 Benchmark 原生分数分开报告：
 
-- **隐私：** ReID@1、Link AUC。
-- **连续性与恢复安全：** Exact Restore、Unsafe Repair。
-- **系统成本：** Token Delta、E2E p95。
+- **决策保持：** `Decision Preservation`，同一 episode 与 Vanilla 对齐后，规范资产和方向（以及可用时的 tool choice）完全一致的比例。
+- **协作连续性：** `Reference Continuity`，同一 episode 中至少两个实际角色/视图引用同一 canonical asset 时，是否使用同一 scope handle；只有一个视图的 episode 记为 `N/A`。
+- **执行恢复：** `Exact Action Restore`，句柄恢复后的资产、市场、方向和数量/权重与外部输出的本地期望一致，并且通过真实执行器/交易约束的比例。
+- **隐私：** `ReID@1`、`Link AUC`。
+- **成本：** `Token Delta`、`E2E p95`。
+
+三个闭环指标不是从结果字符串猜出来的：NLPCC runner 在本地保存每个 episode 的 Vanilla action、受保护 action、候选/持仓/交易视图和执行结果；StockBench/FinVault proxy 在本地日志保存 `input_fingerprint`、恢复后的 `decision_fingerprint`、`episode_id`、`role` 和 binding snapshot。聚合脚本按 episode 对齐，缺少多角色视图或真实执行接受信号时输出 `N/A`，不把单次 JSON parse 当作连续性或执行成功。
 
 实验 artifact 保留完整逐日记录、诊断指标、token、延迟和拒绝原因，便于复核与二次分析；论文正文、表格和进度汇报只展示上述每组 2--3 个核心指标。ReID 和金融效用的 95% CI 直接写在对应单元格或脚注中，不为置信区间单独扩列。其余指标只进入机器可读结果和附录。
 
@@ -120,7 +124,7 @@ Global Fixed Alias 作为经典 pseudonym 控制保留；Deletion 和 Vanilla �
 
 ### Table 1: Benchmark x Base Model x Method 大主表
 
-每行是一个 `Benchmark x Base Model x Method` 实验单元。前四个结果列严格使用该行所属 Benchmark 的原生核心指标，后六个结果列在三个 Benchmark 上统一使用 FinScope 通用指标。原生指标不跨 Benchmark 比大小；通用指标才使用同一列定义比较。
+每行是一个 `Benchmark x Base Model x Method` 实验单元。前四个结果列严格使用该行所属 Benchmark 的原生核心指标，后七个结果列在三个 Benchmark 上统一使用 FinScope 通用指标。原生指标不跨 Benchmark 比大小；通用指标才使用同一列定义比较。
 
 | Benchmark | 原生指标 1 | 原生指标 2 | 原生指标 3 | 原生指标 4 |
 | --- | --- | --- | --- | --- |
@@ -128,7 +132,15 @@ Global Fixed Alias 作为经典 pseudonym 控制保留；Deletion 和 Vanilla �
 | StockBench | Total Return ↑ | Sortino ↑ | MDD ↓ | Sharpe ↑ |
 | FinVault | Benign Task Success ↑ | Attack Success ↓ | Violation-free Execution ↑ | Over-refusal ↓ |
 
-六个新增指标固定为：隐私 `ReID@1 / Link AUC`，恢复安全 `Exact Restore / Unsafe Repair`，成本 `Token Delta / E2E p95`。因此所有 Benchmark 和模型都使用同一套新增评测口径。
+最终主表列固定为 `4 个 Benchmark 原生指标 + 3 个闭环指标 + 2 个隐私指标 + 2 个成本指标`：
+
+| Benchmark | Base Model | Method | 原生 1 | 原生 2 | 原生 3 | 原生 4 | Decision Preservation ↑ | Reference Continuity ↑ | Exact Action Restore ↑ | ReID@1 ↓ | Link AUC →.5 | Token Δ ↓ | E2E p95 ↓ |
+| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 每个 Benchmark × Base Model × Method | ... | ... | native | native | native | native | closed-loop | closed-loop | closed-loop | privacy | privacy | cost | cost |
+
+`Unsafe Repair` 不再挤进主表，它属于故障注入补表；`Exact Restore` 也不再作为主指标，因为它没有说明动作是否通过本地交易约束。下面保留的旧六指标数字是历史 preliminary snapshot，不能按新的列顺序解读，也不能直接写进论文。
+
+### Archived preliminary six-metric snapshot (do not report as Table 1)
 
 | Benchmark | Base LM | Method | 原生指标 1 | 原生指标 2 | 原生指标 3 | 原生指标 4 | ReID@1 ↓ | Link AUC →.5 | Exact Restore ↑ | Unsafe Repair ↓ | Token Δ ↓ | E2E p95 ↓ |
 | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -213,16 +225,27 @@ Global Fixed Alias 作为经典 pseudonym 控制保留；Deletion 和 Vanilla �
 | Violation-free Execution | 执行结束后未触发违规工具调用或危险业务状态的比例 | 越高越好 |
 | Over-refusal | 正常合法请求被错误拒绝的比例 | 越低越好 |
 
-主表后六列由 FinScope 评测协议统一补充，在 NLPCC、StockBench、FinVault 三个 Benchmark 上定义完全不变；它们不替代 Benchmark 原生指标：
+主表后七列由 FinScope 评测协议统一补充，在 NLPCC、StockBench、FinVault 三个 Benchmark 上定义完全不变；它们不替代 Benchmark 原生指标：
 
 | 指标 | 含义 | 方向 |
 | --- | --- | --- |
+| Decision Preservation | 同一 episode 中，保护方法与 Vanilla 的 canonical asset、动作方向以及可用时的 tool choice 完全一致率；NLPCC 当前没有 tool trace，因此只报告 asset+direction | 越高越好 |
+| Reference Continuity | 至少两个真实角色/视图共同引用某资产时，所有视图是否使用同一 scope handle；没有两个视图的 episode 不进入分母 | 越高越好；同时报告覆盖数 |
+| Exact Action Restore | 外部 action 的句柄恢复为唯一 canonical asset，市场/方向/数量/权重等执行字段保持一致，并被本地执行器接受 | 越高越好 |
 | ReID@1 | 攻击者依据匿名 trace 和允许的公开侧信息，第一名猜中真实资产身份的比例 | 越低越好；同时报告候选池随机基线 |
 | Link AUC | 攻击者判断不同 scope/日期的两个匿名对象是否为同一真实实体的能力 | 越接近 0.5 越好 |
-| Exact Restore | 匿名模型输出恢复后，实体、动作和数值与本地 ground truth 完全一致的比例 | 越高越好 |
-| Unsafe Repair | 对本应拒绝的损坏、伪造、过期或歧义输出，系统错误接受并恢复成另一动作的比例 | 越低越好，目标为 0 |
 | Token Delta | 相对同 Benchmark、同模型 Vanilla 的输入输出 token 增减比例 | 越低越好；负数表示节省 |
 | E2E p95 | 从隐私预处理、模型推理到恢复校验完成的端到端延迟第 95 百分位 | 越低越好 |
+
+`Unsafe Repair` 是故障注入补表指标，不进入主表；它统计本应拒绝的损坏、伪造、过期或歧义输出被错误接受的比例，目标为 0。
+
+### 三个闭环指标的实际实现
+
+**Decision Preservation。** 每个方法和 Vanilla 使用同一个 episode key（NLPCC 是交易日；StockBench/FinVault 是 `episode_id + role + input_fingerprint`）。先把 action 中的别名在本地恢复成 canonical asset，再只比较真正表达决策的字段：资产、方向和可用时的 tool choice；数量、金额和权重不放进这个指标，而交给 Exact Action Restore。分母是 Vanilla 的全部对齐 episode，protected 输出解析失败或被拒绝也算未保持。NLPCC 的温度为 0、`do_sample=False`，因此这个比较不是把随机波动误当隐私影响；外部 proxy 用恢复后 action 的本地 hash 对齐，不把敏感 response 写进摘要。
+
+**Reference Continuity。** 不能拿一个句柄查表成功率代替多 Agent 连续性。NLPCC runner 将候选池、持仓和返回 action 分别记录为 research/risk/trade 三个真实视图；某资产至少出现在两个视图时，检查它们是否使用同一个 scope handle。StockBench/FinVault 直接从 proxy audit 的 `episode_id`、`role` 和 `bindings` 聚合：同一 episode 至少有两个角色才进入分母；同一角色在多个请求中发生映射漂移也算失败。只有单个角色或单个视图的 episode 报 `N/A` 并给出 coverage，不能报 100%。
+
+**Exact Action Restore。** 先保存模型返回的匿名 action，再由本地 resolver 恢复 asset；随后对 asset/market/side/quantity/amount/percentage/weight/price 等执行字段做规范化比较。最后必须调用 benchmark 的真实 action validator/executor，现金不足、空仓卖出、权重越界或市场约束失败都使该 episode 记为 0。也就是说，`valid JSON` 和“句柄存在”都不够；只有字段完整、映射唯一且执行器接受，才记为 1。对于没有恢复边界的 Vanilla/Deletion，指标为 `N/A`，不把直接使用真实 ID 或不可恢复删除伪装成成功。
 
 #### 任务模型与攻击者模型
 
@@ -233,6 +256,10 @@ Global Fixed Alias 作为经典 pseudonym 控制保留；Deletion 和 Vanilla �
 - 主表中的当前攻击结果必须标注 `attacker=public-side-information oracle`；模型攻击结果不进入 S1-S5，只在附录敏感性分析中单独记录，不能替换 oracle 主结果。
 
 ## 5. 补充实验表格
+
+**当前执行版已移到 [`coling_supplemental_experiments.md`](coling_supplemental_experiments.md)。** 该文档按现在确定的三组八项实验给出完整表格：动态披露三项、长程替换与效用保持三项、本地小模型选择和组件消融各一项。下面原有的 S1-S5 是早期方案，保留作历史记录，不再作为当前实验清单或论文表格。
+
+### 早期补充表（历史记录，不执行）
 
 Table 1 已经回答“不同 Benchmark、任务基座和方法的最终效用/隐私/恢复/总成本是多少”。下面的补充表不再重复 Table 1 的任何列，也不重新排列主表的六种方法。所有补充实验固定在 **NLPCC 2026 Track 1 public A-set + Qwen3.8-27B 任务模型**，只改变一个 B1 机制因素；尚未通过真实测试窗口的单元统一写 `TBD`，绝不以 smoke 或旧版结果填充。
 

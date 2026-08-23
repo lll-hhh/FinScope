@@ -131,6 +131,8 @@ privacy_agent.close_scope(scope)
 
 ## 5. 模型怎么配置
 
+COLING B1 当前执行版的八项补充实验（动态披露、长程替换与效用保持、本地小模型选择、组件消融）及完整空表见 [`docs/coling_supplemental_experiments.md`](docs/coling_supplemental_experiments.md)。
+
 计划比较三种金融决策基座：
 
 | 名称 | 部署 | 配置用途 |
@@ -284,15 +286,14 @@ trace = adapter.close_episode("20250102-track1")
 
 不要一开始只报告一个自定义 FAL 总分。先报告上述子指标、攻击候选池规模、随机基线、攻击模型、置信区间；只有确定权重和先验后再汇总 FAL。
 
-### 恢复与流程连续性（B1 的主指标）
+### 闭环指标（B1 的主指标）
 
 | 指标 | 定义 | 趋势 |
 | --- | --- | --- |
-| Exact Restoration Rate | 资产、动作、关系和结构完整恢复比例 | 越高越好 |
-| Structured Action Exact Match | 恢复后 JSON action 与 Vanilla action 完全一致率 | 越高越好 |
-| Tool Argument Recovery Success | 工具名和参数可被本地真实工具接受的比例 | 越高越好 |
-| Weight MAE / Constraint Violation | 恢复权重误差及和不为 1、越界等比例 | 越低越好 |
-| Execution Success Rate | 恢复后进入 mock/backtest 并成功执行的比例 | 越高越好 |
+| Decision Preservation | 同一 episode 与 Vanilla 对齐后，canonical asset、方向和可用 tool choice 一致率 | 越高越好 |
+| Reference Continuity | 同一 episode 至少两个角色/视图对同一资产使用同一 scope handle 的比例 | 越高越好；报告覆盖数 |
+| Exact Action Restore | 资产、市场、方向、数量/权重等执行字段恢复一致且通过真实执行约束的比例 | 越高越好 |
+| Execution Success Rate | 恢复后进入 mock/backtest 并成功执行的比例；作为 Exact Action Restore 的执行证据 | 越高越好 |
 | Multi-round Task Completion | 整个多 Agent、多工具任务完成比例 | 越高越好 |
 | Workflow Interruption / Retry Rate | 因歧义、格式和句柄错误中断或重试比例 | 越低越好 |
 | State Equivalence | Vanilla 与防护版执行后的投资组合状态是否一致 | 越高越好 |
@@ -313,7 +314,7 @@ trace = adapter.close_episode("20250102-track1")
 
 对 NLPCC、StockBench、FinVault 分别运行 Vanilla、Deletion、LLM Rewrite、Global Fixed Alias、Episode Alias、FinScope；金融模型分别使用 Qwen3.8-27B、DeepSeek V4 Flash、GLM-5.1。固定 prompt、temperature、数据切分、Agent 工具、随机种子和预算。至少 3 个独立种子；连续交易任务还要报告不同市场时间窗，而不是只跑最好的一段。
 
-正文只输出一张 `Benchmark × Base LM × Method` 大主表：每行按 benchmark 放四个原生指标，并追加统一的隐私、恢复和成本指标。S1-S5 是固定在 NLPCC 上、与主表列正交的补充实验；不同 benchmark 的原生分数不能硬平均。
+正文只输出一张 `Benchmark × Base LM × Method` 大主表：每行按 benchmark 放四个原生指标，再放 `Decision Preservation + Reference Continuity + Exact Action Restore + ReID@1 + Link AUC + Token Delta + E2E p95`。`Unsafe Repair` 只放故障注入补表。S1-S5 是固定在 NLPCC 上、与主表列正交的补充实验；不同 benchmark 的原生分数不能硬平均。
 
 ### E2-E6 NLPCC 单平台正式补充实验
 

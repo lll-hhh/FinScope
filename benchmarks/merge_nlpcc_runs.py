@@ -12,6 +12,7 @@ import statistics
 from typing import Any, Dict, List, Mapping, Sequence
 
 from benchmarks.run_nlpcc_real import FUND_POOL, METHODS, percentile, render_markdown
+from benchmarks.closed_loop_metrics import decision_preservation
 
 
 COMPATIBILITY_FIELDS = (
@@ -133,6 +134,31 @@ def compute_expanded_metrics(
             for row in rows
         )
 
+        decision = decision_preservation(
+            [
+                {
+                    "episode_id": row["date"],
+                    "action": row.get("restored_action"),
+                    "valid": row.get("valid", False),
+                }
+                for row in rows
+            ],
+            [
+                {
+                    "episode_id": row["date"],
+                    "action": row.get("restored_action"),
+                    "valid": row.get("valid", False),
+                }
+                for row in vanilla_rows.values()
+            ],
+        )
+        continuity_rows = [
+            row for row in rows if row.get("reference_continuity") is not None
+        ]
+        exact_rows = [
+            row for row in rows if row.get("exact_action_restore") is not None
+        ]
+
         preprocess = [float(row["preprocess_ms"]) for row in rows]
         postprocess = [float(row["postprocess_ms"]) for row in rows]
         local = [before + after for before, after in zip(preprocess, postprocess)]
@@ -185,6 +211,25 @@ def compute_expanded_metrics(
                 "common_valid_days": sum(common_valid),
                 "asset_agreement_given_common_valid": _mean(asset_matches),
                 "action_agreement_given_common_valid": _mean(action_matches),
+                "decision_preservation_rate": decision["rate"],
+                "decision_preserved_episodes": decision["preserved"],
+                "decision_comparable_episodes": decision["episodes"],
+                "reference_continuity_rate": (
+                    _mean(bool(row.get("reference_continuity")) for row in continuity_rows)
+                    if continuity_rows
+                    else None
+                ),
+                "reference_continuity_episodes": len(continuity_rows),
+                "reference_comparable_assets": sum(
+                    int(row.get("reference_comparable_assets", 0))
+                    for row in continuity_rows
+                ),
+                "exact_action_restore_rate": (
+                    _mean(bool(row.get("exact_action_restore")) for row in exact_rows)
+                    if exact_rows
+                    else None
+                ),
+                "exact_action_restore_episodes": len(exact_rows),
                 "action_counts": dict(sorted(action_counts.items())),
                 "rejection_counts": dict(sorted(rejection_counts.items())),
                 "malformed_output_count": rejection_counts.get(

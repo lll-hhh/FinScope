@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import argparse
-from collections import Counter
+from collections import Counter, defaultdict
 import json
 import math
 from pathlib import Path
@@ -50,6 +50,113 @@ def read_jsonl(path: Path) -> List[Dict[str, Any]]:
     return rows
 
 
+def decision_preservation_from_audits(
+    protected_rows: Sequence[Mapping[str, Any]],
+    vanilla_rows: Sequence[Mapping[str, Any]],
+) -> Dict[str, Any]:
+    """Compare canonical decision fingerprints on the same raw request.
+
+    The proxy records a hash of the raw input before sanitization and a hash of
+    the restored decision after sanitization.  This keeps sensitive response
+    text out of the audit summary while making the comparison reproducible.
+    """
+
+    protected_by_key: Dict[tuple[str, str, str], List[Mapping[str, Any]]] = defaultdict(list)
+    for row in protected_rows:
+        if row.get("status") != "ok":
+            continue
+        key = (
+            str(row.get("episode_id", "")),
+            str(row.get("role", "")),
+            str(row.get("input_fingerprint", "")),
+        )
+        protected_by_key[key].append(row)
+    offsets: Counter[tuple[str, str, str]] = Counter()
+    preserved = 0
+    comparable = 0
+    for row in vanilla_rows:
+        if row.get("status") != "ok":
+            continue
+        key = (
+            str(row.get("episode_id", "")),
+            str(row.get("role", "")),
+            str(row.get("input_fingerprint", "")),
+        )
+        candidates = protected_by_key.get(key, [])
+        offset = offsets[key]
+        offsets[key] += 1
+        if offset >= len(candidates):
+            continue
+        current = candidates[offset]
+        comparable += 1
+        preserved += int(
+            bool(row.get("decision_fingerprint"))
+            and row.get("decision_fingerprint") == current.get("decision_fingerprint")
+        )
+    return {
+        "preserved": preserved,
+        "episodes": comparable,
+        "rate": preserved / comparable if comparable else None,
+    }
+
+
+def reference_continuity_from_audits(rows: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
+    """Measure same-episode, cross-role handle consistency from proxy logs."""
+
+    episode_roles: Dict[str, Dict[str, List[Mapping[str, Any]]]] = defaultdict(
+        lambda: defaultdict(list)
+    )
+    for row in rows:
+        if row.get("status") != "ok" or not isinstance(row.get("bindings"), list):
+            continue
+        bindings = {
+            str(item.get("canonical_id")): str(item.get("alias"))
+            for item in row["bindings"]
+            if isinstance(item, Mapping)
+            and item.get("canonical_id")
+            and item.get("alias")
+        }
+        if bindings:
+            episode_roles[str(row.get("episode_id", ""))][str(row.get("role", ""))].append(
+                bindings
+            )
+    comparable_assets = 0
+    stable_assets = 0
+    comparable_episodes = 0
+    stable_episodes = 0
+    for role_views in episode_roles.values():
+        if len(role_views) < 2:
+            continue
+        comparable_episodes += 1
+        observations: Dict[str, List[str]] = defaultdict(list)
+        for views in role_views.values():
+            # A role may make multiple requests in one episode.  Preserve a
+            # role's own inconsistency as a failed observation.
+            for canonical in set().union(*(view.keys() for view in views)):
+                aliases = [view.get(canonical) for view in views if canonical in view]
+                if aliases:
+                    observations[canonical].append(
+                        aliases[0] if len(set(aliases)) == 1 else "__role_drift__"
+                    )
+        episode_stable = True
+        for aliases in observations.values():
+            if len(aliases) < 2:
+                continue
+            comparable_assets += 1
+            stable = len(set(aliases)) == 1
+            stable_assets += int(stable)
+            episode_stable = episode_stable and stable
+        stable_episodes += int(episode_stable)
+    return {
+        "stable": stable_assets,
+        "comparable_assets": comparable_assets,
+        "asset_rate": stable_assets / comparable_assets if comparable_assets else None,
+        "stable_episodes": stable_episodes,
+        "episodes": comparable_episodes,
+        "episode_rate": stable_episodes / comparable_episodes if comparable_episodes else None,
+    }
+
+
 def usage_total(usage: Any) -> int:
     return int(usage.get("total_tokens", 0)) if isinstance(usage, Mapping) else 0
 
@@ -60,6 +167,9 @@ def summarize_audit(path: Path) -> Dict[str, Any] | None:
         return None
     successful = [row for row in rows if row.get("status") == "ok"]
     restoration = [row for row in successful if row.get("exact_restore") is not None]
+    action_restore = [
+        row for row in successful if row.get("exact_action_restore") is not None
+    ]
     return {
         "requests": len(rows),
         "successful_requests": len(successful),
@@ -91,6 +201,12 @@ def summarize_audit(path: Path) -> Dict[str, Any] | None:
         "exact_restore_rate": (
             sum(bool(row.get("exact_restore")) for row in restoration) / len(restoration)
             if restoration
+            else None
+        ),
+        "exact_action_restore_rate": (
+            sum(bool(row.get("exact_action_restore")) for row in action_restore)
+            / len(action_restore)
+            if action_restore
             else None
         ),
         "unsafe_repair_rate": (
@@ -324,9 +440,13 @@ def main() -> None:
     }
     rows: List[Dict[str, Any]] = []
     vanilla_cost = summarize_stockbench_vanilla_cache(args.stockbench_root)
+    audit_rows_by_method: Dict[tuple[str, str], List[Dict[str, Any]]] = {}
     for benchmark in ("stockbench", "finvault"):
         for method in METHODS:
-            audit = summarize_audit(args.run_root / f"{benchmark}_{method}_audit.jsonl")
+            audit_path = args.run_root / f"{benchmark}_{method}_audit.jsonl"
+            raw_audit_rows = read_jsonl(audit_path)
+            audit_rows_by_method[(benchmark, method)] = raw_audit_rows
+            audit = summarize_audit(audit_path)
             if benchmark == "stockbench" and method == "vanilla":
                 audit = vanilla_cost
             if benchmark == "stockbench":
@@ -354,15 +474,26 @@ def main() -> None:
     for benchmark in ("stockbench", "finvault"):
         benchmark_rows = [row for row in rows if row["benchmark"] == benchmark]
         baseline = next(row for row in benchmark_rows if row["method"] == "vanilla")
+        baseline_audit_rows = audit_rows_by_method.get((benchmark, "vanilla"), [])
         baseline_tokens = (baseline.get("audit") or {}).get("total_tokens")
-        if not baseline_tokens:
-            continue
         for row in benchmark_rows:
             audit = row.get("audit") or {}
-            if row["complete"] and audit.get("total_tokens") is not None:
+            if baseline_tokens and row["complete"] and audit.get("total_tokens") is not None:
                 row["token_delta_vs_vanilla"] = (
                     audit["total_tokens"] / baseline_tokens - 1.0
                 )
+            method_audit_rows = audit_rows_by_method.get((benchmark, row["method"]), [])
+            row["decision_preservation"] = (
+                decision_preservation_from_audits(
+                    method_audit_rows,
+                    baseline_audit_rows,
+                )
+                if row["method"] != "vanilla" and method_audit_rows and baseline_audit_rows
+                else None
+            )
+            row["reference_continuity"] = reference_continuity_from_audits(
+                method_audit_rows
+            )
     output = {
         "schema_version": 1,
         "rows": rows,

@@ -250,6 +250,85 @@ def _transform(value: Any, function) -> Any:
     return value
 
 
+_DECISION_FIELDS = frozenset(
+    {
+        "asset",
+        "asset_code",
+        "asset_name",
+        "amount",
+        "instrument",
+        "market",
+        "notional",
+        "order_side",
+        "percentage",
+        "price",
+        "quantity",
+        "qty",
+        "shares",
+        "side",
+        "symbol",
+        "ticker",
+        "tool",
+        "venue",
+        "weight",
+    }
+)
+
+
+def _decision_projection(value: Any) -> Optional[Dict[str, Any]]:
+    """Extract only executable decision fields from a local response."""
+
+    if isinstance(value, Mapping):
+        keys = {str(key).casefold() for key in value}
+        if keys & _DECISION_FIELDS:
+            return {
+                str(key).casefold(): value[key]
+                for key in value
+                if str(key).casefold() in _DECISION_FIELDS
+            }
+        for key in (
+            "choices",
+            "message",
+            "tool_calls",
+            "function",
+            "arguments",
+            "content",
+            "output",
+            "result",
+        ):
+            if key in value:
+                found = _decision_projection(value[key])
+                if found is not None:
+                    return found
+    elif isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+        for item in value:
+            found = _decision_projection(item)
+            if found is not None:
+                return found
+    elif isinstance(value, str):
+        candidate = value.strip()
+        try:
+            parsed = json.loads(candidate)
+        except json.JSONDecodeError:
+            match = re.search(r"\{.*\}", candidate, re.DOTALL)
+            if not match:
+                return None
+            try:
+                parsed = json.loads(match.group(0))
+            except json.JSONDecodeError:
+                return None
+        return _decision_projection(parsed)
+    return None
+
+
+def _decision_fingerprint(value: Any) -> Optional[str]:
+    projection = _decision_projection(value)
+    if projection is None:
+        return None
+    encoded = json.dumps(projection, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+
 class IdentityCatalog:
     def __init__(self, entries: Sequence[CatalogEntry]) -> None:
         self.entries = tuple(entries)
@@ -660,6 +739,14 @@ def create_app(config: ProxyConfig, entries: Sequence[CatalogEntry]):
         episode = controller.episode_id(payload)
         role = controller.role(payload)
         raw_messages = payload.get("messages", [])
+        input_fingerprint = hashlib.sha256(
+            json.dumps(
+                raw_messages,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        ).hexdigest()
         input_sensitive = controller.catalog.count(raw_messages)
         rewrite = {"status": "not_applicable", "usage": {}, "latency_ms": 0.0}
         outbound, state = controller.transform(payload, episode)
@@ -685,6 +772,7 @@ def create_app(config: ProxyConfig, entries: Sequence[CatalogEntry]):
                     "role": role,
                     "status": "error",
                     "error": str(exc)[:500],
+                    "input_fingerprint": input_fingerprint,
                     "input_sensitive": input_sensitive,
                     "outbound_sensitive": outbound_sensitive,
                     "rewrite": rewrite,
@@ -692,6 +780,7 @@ def create_app(config: ProxyConfig, entries: Sequence[CatalogEntry]):
             )
             raise HTTPException(status_code=502, detail="upstream model call failed") from exc
         total_latency_ms = (time.perf_counter() - request_started) * 1000
+        decision_fingerprint = _decision_fingerprint(restored)
         privacy_model_usage = (
             usage_delta(privacy_usage_before, controller.privacy_bundle.usage())
             if controller.privacy_bundle is not None
@@ -709,6 +798,8 @@ def create_app(config: ProxyConfig, entries: Sequence[CatalogEntry]):
                 "episode_id": episode,
                 "role": role,
                 "status": "ok",
+                "input_fingerprint": input_fingerprint,
+                "decision_fingerprint": decision_fingerprint,
                 "input_sensitive": input_sensitive,
                 "outbound_sensitive": outbound_sensitive,
                 "upstream_sensitive": upstream_sensitive,

@@ -59,7 +59,7 @@ FinScope 不是只优化一个隐私分数，而是同时考察四类目标：
 
 1. **披露约束：** 降低真实资产重识别和跨作用域关联，同时记录直接泄露与累计泄露。
 2. **语义保真：** 保留金融决策所需信息，使 Benchmark 原生任务指标尽量接近未保护的 Agent。
-3. **恢复与执行：** 最大化 Exact Restore、工具参数恢复和真实执行成功率，最小化 Unsafe Repair。
+3. **闭环保持：** 分别报告 Decision Preservation、Reference Continuity 和 Exact Action Restore；故障注入再最小化 Unsafe Repair。
 4. **运行成本：** 控制额外 token、模型调用、重试和端到端尾延迟。
 
 这四项目标存在真实冲突。更粗的 P5 描述通常降低身份推断，但也可能降低金融效用；更细的 P1/P2 描述提高任务信息量，也增加重识别风险。论文应报告这条前沿，而不是声称存在无代价的完全匿名。
@@ -142,7 +142,7 @@ FinScope 将恢复分为确定性句柄解析、歧义审计和业务动作校�
 
 ### 4.4 隐私、金融效用与可执行连续性的联合评测
 
-论文在相同任务轨迹上同时报告 Benchmark 原生指标、主动重识别与跨日关联、Exact Restore/Unsafe Repair，以及 token 和 p95 时延。其研究对象不是静态匿名文本，而是“保护后的语言结果能否安全回到金融环境状态”的完整闭环。
+论文在相同任务轨迹上同时报告 Benchmark 原生指标、Decision Preservation、Reference Continuity、Exact Action Restore、主动重识别与跨日关联，以及 token 和 p95 时延。Unsafe Repair 只在故障注入表中报告。其研究对象不是静态匿名文本，而是“保护后的语言结果能否安全回到金融环境状态”的完整闭环。
 
 ## 5. 故事主线
 
@@ -187,7 +187,7 @@ FinScope 作为额外的本地智能体参与工作流：在请求发出前，�
 
 ### 7.1 六方法主结果（旧版工程参考，不是最终结果）
 
-前四列是 NLPCC 原生金融任务指标，后六列是 FinScope 协议补充的隐私、恢复安全与系统成本指标。隐私主攻击者是 `public-side-information oracle`：它使用公开证券主表属性和价格侧信息，但看不到本地句柄、持仓或映射；它不是 Qwen 任务模型本身。
+前四列是 NLPCC 原生金融任务指标；旧表后六列仅是历史工程参考，不能作为当前主表。新的正式主表使用 Decision Preservation、Reference Continuity、Exact Action Restore、ReID@1、Link AUC、Token Delta 和 E2E p95。隐私主攻击者是 `public-side-information oracle`：它使用公开证券主表属性和价格侧信息，但看不到本地句柄、持仓或映射；它不是 Qwen 任务模型本身。
 
 | Method | Sharpe ↑ | Return ↑ | MDD ↓ | Valid ↑ | ReID@1 ↓ | Link AUC →.5 | Exact Restore ↑ | Unsafe Repair ↓ | Token Δ ↓ | E2E p95 ↓ |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
