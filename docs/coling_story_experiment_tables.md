@@ -1,10 +1,10 @@
 # FinScope: COLING 论文故事、实验清单与表格草案
 
-更新日期：2026-08-22。`Measured` 表示已有真实实验结果，`TBD` 表示必须补跑，`--` 表示不适用。当前结果来自 NLPCC 2026 Track 1 public A-set 的全年重放，不是官方榜单提交，也不是最终多模型统计结果。
+更新日期：2026-08-23。`Measured` 表示已有真实实验结果，`TBD` 表示必须补跑，`--` 表示不适用。当前结果来自 NLPCC 2026 Track 1 public A-set 的全年重放，不是官方榜单提交，也不是最终多模型统计结果。
 
 ### 重跑状态（Qwen 小模型本地 Agent）
 
-此前表中的全年 Qwen3.8-27B 数字来自 deterministic local-agent 版本，只保留为 preliminary engineering reference；不能当作本地小模型最终结果。新协议固定 Qwen3.8-27B 为任务模型，另用不超过 4B 的本地小模型承担识别、规划和审计，并在严格模式下禁止整套 fallback。当前 Qwen3.5-2B 已通过双资产三角色 toy smoke 和 11 资产单交易日 NLPCC pipeline smoke；这不是全年统计，主表的全年单元仍保持 `TBD`。全年重跑曾在第一个交易日遭遇任务模型 endpoint timeout，已记录为运行故障，恢复后必须从兼容 checkpoint 重新开始。正式候选固定为 `benchmarks/local_privacy_models.json` 中的 10 个模型。
+此前表中的全年 Qwen3.8-27B 数字来自 deterministic local-agent 版本，只保留为 preliminary engineering reference；不能当作本地小模型最终结果。新协议固定 Qwen3.8-27B 为任务模型，另用不超过 4B 的本地小模型承担识别、规划和审计，并在严格模式下禁止整套 fallback。当前 Qwen3.5-2B 已通过双资产三角色 toy smoke 和 11 资产单交易日 NLPCC pipeline smoke；这不是全年统计，主表的全年单元仍保持 `TBD`。2026-08-23 的 StockBench/FinVault 重跑在 Qwen 8104 服务退出后出现 502，已停止并隔离，所有中间产物均不进入表格；正式重跑必须从新的 run root 开始。正式候选固定为 `benchmarks/local_privacy_models.json` 中的 10 个模型。
 
 ## 1. 论文定位
 
@@ -234,150 +234,115 @@ Global Fixed Alias 作为经典 pseudonym 控制保留；Deletion 和 Vanilla �
 
 ## 5. 补充实验表格
 
-### Table 2: NLPCC 原生金融效用（Measured）
+Table 1 已经回答“不同 Benchmark、任务基座和方法的最终效用/隐私/恢复/总成本是多少”。下面的补充表不再重复 Table 1 的任何列，也不重新排列主表的六种方法。所有补充实验固定在 **NLPCC 2026 Track 1 public A-set + Qwen3.8-27B 任务模型**，只改变一个 B1 机制因素；尚未通过真实测试窗口的单元统一写 `TBD`，绝不以 smoke 或旧版结果填充。
 
-| Method | Return ↑ | Sharpe ↑ | MDD ↓ |
-| --- | ---: | ---: | ---: |
-| Vanilla | **39.45%** | **2.426** | 6.88% |
-| Deletion | 0.00% | 0.000 | 0.00% |
-| LLM Rewrite | 36.30% | 2.165 | 6.86% |
-| Global Alias | 25.28% | 2.264 | **4.43%** |
-| Episode Alias | 33.14% | 2.260 | 6.29% |
-| FinScope P3 | 34.31% | **2.976** | **3.34%** |
+### Table S1: 本地隐私 Agent 选型（10 个模型，均 ≤4B）
 
-Deletion 的零回撤不是优势，而是从未执行交易。正文不能将其加粗或描述为低风险方法。
-
-### Table 3: 主动隐私攻击
-
-攻击者可观察全部匿名 prompt/output、跨 Agent trace、跨日 trace，以及公开新闻和行情；不可读取本地映射。所有攻击指标报告均值、95% CI、随机基线和候选池规模。
-
-| Method | Direct Leak ↓ | ReID@1 ↓ | Link AUC →.5 |
-| --- | ---: | ---: | ---: |
-| Vanilla | 100.0% | 100.00% | 1.000 |
-| Deletion | 0.0% | 100.00% | 1.000 |
-| LLM Rewrite | 0.0% | 100.00% | 1.000 |
-| Global Alias | 0.0% | 100.00% | 1.000 |
-| Episode Alias | 0.0% | 100.00% | 1.000 |
-| FinScope P3 | **0.0%** | **53.20%** | **0.789** |
-
-当前另有一个不依赖攻击模型的诊断指标：Global Alias 的跨日唯一字符串链接率为 100%，FinScope 为 0%。它只能作为机制 sanity check，不能替代 Link AUC。
-
-### Table 4: 恢复与流程连续性
-
-| Method | Execution ↑ | Exact Restore ↑ | Unsafe Repair ↓ |
-| --- | ---: | ---: | ---: |
-| Vanilla | 98.8% | -- | -- |
-| Deletion | 0.0% | -- | -- |
-| LLM Rewrite | 100.0% | -- | -- |
-| Global Alias | 97.5% | TBD | TBD |
-| Episode Alias | 99.2% | TBD | TBD |
-| FinScope P3 | 99.2% | **100.0%** | **0.0%** |
-
-自然运行中 FinScope 有 6 次 malformed JSON、3 次 `direct_identity_output` 审计拒绝和 1 次卖出空持仓。Exact Restore、State Equivalence 和 Unsafe Repair 必须通过保存本地 ground truth 和故障注入正式评分，不能用 `Valid/Parsed` 代替。
-
-### Table 5: P1-P5 隐私-效用曲线
-
-| Level | Semantic fields | Sharpe ↑ | ReID@1 ↓ | Link AUC →.5 |
-| --- | --- | ---: | ---: | ---: |
-| P1 | 最丰富的受验证语义 | 2.047 | 93.27% | 0.872 |
-| P2 | 较丰富语义 | 1.934 | 88.10% | 0.871 |
-| P3 | 标准语义 | **2.976** | 53.20% | 0.789 |
-| P4 | 粗粒度语义 | 1.434 | 24.24% | 0.647 |
-| P5 | 最小语义/执行句柄 | 1.856 | **9.09%** | **0.500** |
-| Adaptive | 开发集标定的最小可用级别 | TBD | TBD | TBD |
-
-P1-P5 的具体字段定义应在论文方法表中固定，测试集上不能根据收益反向挑选等级。Adaptive 必须仅在开发集标定。
-
-### Table 6: 恢复鲁棒性与故障注入（工程诊断，不进入论文）
-
-| Perturbation | Exact Restore ↑ | Correct Reject ↑ | Unsafe Repair ↓ |
-| --- | ---: | ---: | ---: |
-| Prefix/suffix/quotes/brackets | 100.0% | -- | 0.0% |
-| Descriptor without handle | 0.0% | 100.0% | 0.0% |
-| Swap two same-type handles | 0.0% | 0.0% | 100.0% |
-| Truncated/fabricated handle | 0.0% | 100.0% | 0.0% |
-| Stale previous-day handle | 0.0% | 100.0% | 0.0% |
-| Coreference points to wrong asset | TBD | TBD | TBD |
-| Partial/malformed JSON | 0.0% | 100.0% | 0.0% |
-| Out-of-range amount/weight | 0.0% | 100.0% | 0.0% |
-| Tool schema drift | TBD | TBD | TBD |
-
-这些数字来自当前回归/trace 诊断，部分使用受控 portfolio；它们只用于发现实现错误，不应作为论文百分比。正式论文结果必须使用 Table 11 S4 的真实模型输出、真实 portfolio state 和 NLPCC action replay。
-
-### Table 7: NLPCC 机制消融（正式 trace，不使用 toy case）
-
-任务模型、2025 NLPCC A-set、候选池、P3、公开侧信息攻击器和测试窗口全部固定；每个变体都重放真实交易日并生成匿名 trace。该表只保留能直接解释 B1 主线的机制变量。
-
-| Variant | Sharpe ↑ | Valid ↑ | ReID@1 ↓ | Link AUC →.5 | Exact Restore ↑ | Unsafe Repair ↓ | E2E p95 ↓ |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Full FinScope P3 | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| Episode-scoped opaque alias | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| Handles only + scope rotation | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| FinScope without security-master validation | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| FinScope without restoration auditor | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-
-这不是把每个内部开关都做成探针；每一行都对应一个论文解释：语义是否必要、生命周期是否必要、事实验证是否必要、审计是否必要。Table 1 中的旧全年数字不能直接填入此表，必须用锁定小模型在同一测试窗口重跑。always-scan/cache 命中等纯成本开关只保留在运行 artifact 和附录。
-
-### Table 10: 本地隐私小模型正式消融（NLPCC 单平台，10 个模型，均 ≤4B）
+**服务的故事：** FinScope 是一个额外的本地智能体，而不是把任务模型再复制一遍。本表证明识别、规划和审计可以由小模型承担，并用本地 Agent 自己的可靠性和开销锁定主模型；主表中的金融收益和原生 Valid 不在此重复。
 
 任务模型固定为 Qwen3.8-27B；使用官方 NLPCC 2026 Track 1 public A-set，按时间顺序固定前 20 个交易日为开发集，其余交易日为测试集。10 个 instruction-tuned 本地模型共用同一 JSON 协议、P3、候选池、调用预算和三个角色（recognizer/planner/auditor）。严格模式禁止整套 deterministic fallback；字段级安全规范化单独计入 `planner_repairs`。
 
 模型清单和下载状态见 [`benchmarks/local_privacy_models.json`](../benchmarks/local_privacy_models.json)。
 
-| Local privacy model | Size | Family / era | Dev strict planner valid ↑ | Recognizer failure ↓ | Auditor failure ↓ | Fallback count ↓ | Privacy-agent p95 ↓ | Dev NLPCC Valid ↑ | Dev Sharpe ↑ | Availability |
-| --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| Qwen3.5-0.8B | 0.8B | Qwen3.5 / 2026 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | ready |
-| Qwen3.5-2B | 2B | Qwen3.5 / 2026 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | ready |
-| Qwen3.5-4B | 4B | Qwen3.5 / 2026 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | ready |
-| Qwen3-0.6B | 0.6B | Qwen3 / 2025 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | download required |
-| Qwen3-1.7B | 1.7B | Qwen3 / 2025 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | download required |
-| Llama-3.2-1B-Instruct | 1B | Llama 3.2 / 2024 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | ready |
-| Llama-3.2-3B-Instruct | 3B | Llama 3.2 / 2024 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | ready |
-| Gemma-3-1B-it | 1B | Gemma 3 / 2025 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | ready |
-| Gemma-3-4B-it | 4B | Gemma 3 / 2025 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | ready |
-| Gemma-4-4B-it | 4B | Gemma 4 / 2026 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | alias required |
+| Local privacy model | Size | Strict planner valid ↑ | Recognizer fail ↓ | Auditor fail ↓ | Whole fallback ↓ | Planner repair rate ↓ | Calls / asset ↓ | Local Agent p95 ↓ | Availability |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| Qwen3.5-0.8B | 0.8B | TBD | TBD | TBD | TBD | TBD | TBD | TBD | ready |
+| Qwen3.5-2B | 2B | TBD | TBD | TBD | TBD | TBD | TBD | TBD | ready |
+| Qwen3.5-4B | 4B | TBD | TBD | TBD | TBD | TBD | TBD | TBD | ready |
+| Qwen3-0.6B | 0.6B | TBD | TBD | TBD | TBD | TBD | TBD | TBD | download required |
+| Qwen3-1.7B | 1.7B | TBD | TBD | TBD | TBD | TBD | TBD | TBD | download required |
+| Llama-3.2-1B-Instruct | 1B | TBD | TBD | TBD | TBD | TBD | TBD | TBD | ready |
+| Llama-3.2-3B-Instruct | 3B | TBD | TBD | TBD | TBD | TBD | TBD | TBD | ready |
+| Gemma-3-1B-it | 1B | TBD | TBD | TBD | TBD | TBD | TBD | TBD | ready |
+| Gemma-3-4B-it | 4B | TBD | TBD | TBD | TBD | TBD | TBD | TBD | ready |
+| Gemma-4-4B-it | 4B | TBD | TBD | TBD | TBD | TBD | TBD | TBD | alias required |
 
 预注册选择规则：先要求严格 planner valid ≥99%、recognizer/auditor failure = 0、fallback = 0；满足者中优先本地 p95 和 token 更低者，再检查开发集 NLPCC Valid。开发集只用于选主方法，测试集不能反选。当前已有的双资产和单日 smoke 只用于排查服务，不填入这张正式表，也不作为论文百分比。
 
-小模型指标含义：`Dev strict planner valid` 是每个真实资产在无整套 fallback 时产生可验证计划的比例；`Recognizer/Auditor failure` 是 JSON 解析或语义审计失败率；`Fallback count` 必须为零；`Privacy-agent p95` 只统计本地 Agent 三角色额外调用；`Dev NLPCC Valid/Sharpe` 是真实开发窗口的 Benchmark 原生结果。
+小模型指标含义：`Strict planner valid` 是不调用整套 deterministic fallback 时产生合法、可验证计划的比例；`Whole fallback` 是整条链路退回确定性计划的次数；`Planner repair rate` 只计字段级安全规范化，不把失败伪装成成功；`Calls / asset` 和 `Local Agent p95` 只统计本地 Agent，不包含任务模型端到端延迟。
 
-### Table 11: NLPCC 单平台 B1 完整性实验（4 项正式补充）
+### Table S2: P1-P5 语义预算与本地决策
 
-以下实验都使用同一 NLPCC 2026 Track 1 public A-set、官方 DataLoader、同一 Qwen3.8-27B 任务模型和 Table 10 选出的本地模型。除非明确写出开发集，所有数字均来自未参与模型选择的测试交易日；不使用双资产 toy、静态伪造输入或单元测试百分比。
+**服务的故事：** B1 不是只把名称换成随机串，而是由本地 Agent 按任务需要选择最小必要语义。本表回答“每个披露级别实际释放了什么、验证器是否接受、代价如何”，不重复主表的 Sharpe、ReID@1 或 Link AUC。
+
+| Level | Allowed master fields | Mean disclosed fields / asset ↓ | Mean disclosure tokens ↓ | Direct-identity guard rejects ↑ | Planner repair rate ↓ | Cache hit rate ↑ | Trade escalation rate ↓ |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| P1 | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| P2 | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| P3 | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| P4 | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| P5 | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| Adaptive (dev calibrated) | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+
+`Allowed master fields` 是证券主表中允许外发的字段集合；`Direct-identity guard rejects` 统计本地验证器拦截模型直接复述真实身份的次数；`Trade escalation` 是交易动作触发更严格披露或人工/代码校验的比例。测试集不能反向选择 P-level。
+
+### Table S3: 多 Agent 作用域生命周期
+
+**服务的故事：** FinScope 是多智能体系统里新增的本地 Agent。研究、风控、交易节点需要在同一任务内指向同一资产，但下一交易日不能继续沿用旧身份。本表只测协作和生命周期性质，不重复主表的跨方法 Link AUC。
+
+| Protocol | Same-day cross-role binding agreement ↑ | Cross-scope handle reuse ↓ | Stale-handle rejection ↑ | Unauthorized role access blocked ↑ | Rotation completion ↑ | Mapping lifetime (days) ↓ |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Global fixed alias | TBD | TBD | TBD | TBD | TBD | TBD |
+| Episode opaque alias | TBD | TBD | TBD | TBD | TBD | TBD |
+| FinScope handles-only | TBD | TBD | TBD | TBD | TBD | TBD |
+| FinScope full (P3) | TBD | TBD | TBD | TBD | TBD | TBD |
+
+`Same-day cross-role binding agreement` 检查 research/risk/trade 是否得到同一 scope 内同一 canonical entity；`Cross-scope handle reuse` 检查旧句柄是否在新交易日或新任务中复用；`Mapping lifetime` 记录本地映射保留时间。该表解释“为什么要有独立本地 Agent 和 scope”，不是再次报告任务收益。
+
+### Table S4: 真实 Portfolio Trace 故障边界
+
+**服务的故事：** 恢复不是文本后处理，而是交易前安全边界。本表从真实 NLPCC 模型输出和对应 portfolio state 注入故障，报告系统如何发现、拒绝并中断执行；主表只保留聚合的 Exact Restore/Unsafe Repair，因此不在这里重复这两列。
+
+| Fault injected into accepted trace | Detection stage | Correct-reject reason code coverage ↑ | State equivalence after accepted clean trace ↑ | Execution interruption on unsafe trace ↑ | Manual escalation rate ↑ |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Truncated handle | binding resolver | TBD | TBD | TBD | TBD |
+| Fabricated handle | binding resolver | TBD | TBD | TBD | TBD |
+| Previous-day handle | scope validator | TBD | TBD | TBD | TBD |
+| Same-type handle swap | ambiguity auditor | TBD | TBD | TBD | TBD |
+| Descriptor without handle | action validator | TBD | TBD | TBD | TBD |
+| Schema / numeric overflow | business validator | TBD | TBD | TBD | TBD |
+
+`Reason code coverage` 要求每个拒绝都能落到可审计的错误类别；`State equivalence` 只对未注入的 clean trace 检查恢复后 portfolio state 是否等价；`Execution interruption` 检查危险输入是否在交易提交前被截断。双资产 smoke 和单元测试不填入此表。
+
+### Table S5: B1 组件必要性消融
+
+**服务的故事：** 该表把 FinScope 的闭环拆成可解释的必要组件，回答“收益/隐私变化不是某个无关开关造成的”。所有变体固定同一任务模型、数据和 P3，只删除一个组件；不重复主表结果，而记录组件对安全事件的捕获类型。
+
+| Variant | Removed component | Direct identity caught ↑ | Invalid master field caught ↑ | Scope violation caught ↑ | Ambiguity escalated ↑ | Pre-trade invalid action blocked ↑ | Failure code completeness ↑ |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Full FinScope | none | TBD | TBD | TBD | TBD | TBD | TBD |
+| No semantic planner | P1-P5 planner | TBD | TBD | TBD | TBD | TBD | TBD |
+| No scope rotation | day/task rotation | TBD | TBD | TBD | TBD | TBD | TBD |
+| No security-master validation | fact/type validator | TBD | TBD | TBD | TBD | TBD | TBD |
+| No restoration auditor | ambiguity auditor | TBD | TBD | TBD | TBD | TBD | TBD |
+
+该表的因变量是安全门控事件和错误分类覆盖率，而不是主表的金融分数；若某变体导致任务完全无法运行，记录为机制失败并在正文解释，不用零收益制造“更安全”的结论。
+
+### Supplement map: Table S1-S5 与论文故事的对应关系
+
+| Supplement | 独立回答的问题 | 支撑的故事段落 | 不重复 Table 1 的原因 |
+| --- | --- | --- | --- |
+| S1 | 哪个 ≤4B 本地模型足以运行隐私 Agent？ | 本地 Agent 可行性与模型选择 | 只报告本地 Agent 可靠性/调用开销 |
+| S2 | P1-P5 实际释放哪些金融语义？ | 最小必要语义披露 | 只报告字段预算和验证行为 |
+| S3 | 多 Agent 如何共享同一指称并跨日轮换？ | 作用域生命周期与协作连续性 | 只报告绑定、轮换和权限事件 |
+| S4 | 损坏输出为何不能直接进入交易？ | 恢复即执行安全边界 | 只报告故障检测、状态等价和中断 |
+| S5 | 哪些组件是闭环成立的必要条件？ | 机制因果解释 | 只报告安全门控捕获类型 |
+
+这张对应关系表本身是写作索引，不是实验结果表；它防止把 Table 1 的指标复制到补充材料。
+
+### Table S1-S5 的统一实验边界
+
+以下实验都使用同一 NLPCC 2026 Track 1 public A-set、官方 DataLoader、同一 Qwen3.8-27B 任务模型和 Table S1 选出的本地模型。除非明确写出开发集，所有数字均来自未参与模型选择的测试交易日；不使用双资产 toy、静态伪造输入或单元测试百分比。
 
 | ID | Formal protocol on NLPCC | Controlled change | Primary report | B1 claim |
 | --- | --- | --- | --- | --- |
-| S1 | 10-model local Agent ablation on fixed 20-day development prefix; selected model replayed on held-out days | only local recognizer/planner/auditor model changes | strict validity, failures, fallback, local p95/token, Valid, Sharpe | 本地小模型足以承担隐私 Agent，且选择不依赖测试收益 |
-| S2 | Full held-out daily replay at P1/P2/P3/P4/P5 with selected model | only disclosure level changes | Sharpe, Return, MDD, ReID@1, Link AUC, Exact Restore, Unsafe Repair | 语义披露形成可量化隐私—效用前沿 |
-| S3 | Three logical roles (research/risk/trade) share a scope within each day and rotate at day boundary; replay real candidate/news/action traces | global alias vs episode alias vs FinScope lifecycle | same-day cross-role binding consistency, stale-handle rejection, cross-day Link AUC, workflow completion | 生命周期绑定支持多 Agent 连续协作而非只替换字符串 |
-| S4 | Inject faults into accepted real FinScope outputs and replay the corresponding NLPCC action at its recorded portfolio state | clean output vs truncated/forged/stale/swapped/schema/numeric faults | Exact Restore, Correct Reject, Unsafe Repair, State Equivalence, execution interruption | 恢复是交易前安全边界，异常结果 fail-closed |
+| S1 | 10-model local Agent ablation on fixed 20-day development prefix; selected model replayed on held-out days | only local recognizer/planner/auditor model changes | strict planner validity, failures, fallback, repairs, local calls and p95 | 本地小模型足以承担隐私 Agent，且选择不依赖测试收益 |
+| S2 | Full held-out daily replay at P1/P2/P3/P4/P5 with selected model | only disclosure level changes | allowed fields, disclosed tokens, verifier decisions, repair/cache/escalation behavior | 语义披露是可控预算，而非随机字符串替换 |
+| S3 | Three logical roles (research/risk/trade) share a scope within each day and rotate at day boundary; replay real candidate/news/action traces | global alias vs episode alias vs FinScope lifecycle | cross-role agreement, scope reuse, stale rejection, role authorization, rotation completion | 生命周期绑定支持多 Agent 连续协作而非只替换字符串 |
+| S4 | Inject faults into accepted real FinScope outputs and replay the corresponding NLPCC action at its recorded portfolio state | clean output vs truncated/forged/stale/swapped/schema/numeric faults | reason-code coverage, state equivalence, execution interruption, escalation | 恢复是交易前安全边界，异常结果 fail-closed |
+| S5 | Re-run the same held-out traces after removing one FinScope component | planner, scope rotation, security master, or auditor removal | component-specific security event capture and gate coverage | 每个组件对闭环安全有可归因作用 |
 
-S3 的攻击仍使用公开证券主表/行情属性 oracle；S4 必须从真实模型输出和真实 portfolio trace 生成扰动。当前脚本中的 synthetic portfolio、双资产 smoke 和单元测试只能作为工程回归，不得替代 S3/S4 的正式结果。攻击模型能力敏感性不再列为必做主补充表，必要时放入附录。
-
-### Table 8: 成本与延迟（Measured）
-
-| Method | Token Δ ↓ | E2E p95 ↓ |
-| --- | ---: | ---: |
-| Vanilla | ref. | 8.216 s |
-| Deletion | -3.4% | **7.751 s** |
-| LLM Rewrite | +10.6% | 27.663 s |
-| Global Alias | +0.1% | 8.180 s |
-| Episode Alias | +3.6% | 8.364 s |
-| FinScope P3 | **-50.9%** | **7.031 s** |
-
-本表只报告读者最容易解释的 token 增量和端到端尾延迟。detector/planner/auditor 调用次数、cache hit、probe、峰值显存、API 金额和 GPU 能耗保留在机器可读 artifact；仅在成本异常或审稿人要求时进入附录。
-
-### Table 9: 攻击强度与累计泄露（附录敏感性，不是必做补充）
-
-| Setting | Values | ReID@1 ↓ | Link AUC →.5 |
-| --- | --- | ---: | ---: |
-| Query budget | 1 / 3 / 5 / 10 | TBD | TBD |
-| Candidate pool | 20 / 100 / 500 / full | TBD | TBD |
-| Observable agents | research / +risk / +trade | TBD | TBD |
-| Public side info | none / news / news+prices | TBD | TBD |
-| Attack model | Qwen / DeepSeek / GLM | TBD | TBD |
-
-Table 11 的四项 NLPCC 补充不依赖这张敏感性表；只有在 S1-S4 完成后仍有时间和预算，才按固定攻击预算补跑。不能用这里的 TBD 或 toy 攻击替代主结果。
+S3 的攻击仍使用公开证券主表/行情属性 oracle；S4 必须从真实模型输出和真实 portfolio trace 生成扰动。攻击者能力、查询预算、候选池规模和 side-information 敏感性不进入正文补充表；如审稿人要求，放到附录并只报告相对主攻击的变化，不能再复制 Table 1 的完整指标矩阵。
 
 ## 6. 实验执行清单
 
@@ -388,12 +353,12 @@ Table 11 的四项 NLPCC 补充不依赖这张敏感性表；只有在 S1-S4 完
 3. 按 `benchmarks/local_privacy_models.json` 在 NLPCC 固定开发窗口跑完 10 个 ≤4B 本地模型，按预注册规则锁定主方法模型。
 4. 用锁定的小模型完成 Qwen3.8-27B x NLPCC 的六方法全量重放，再决定是否扩展到 StockBench/FinVault。
 5. 建立本地 attack ground truth，运行公开侧信息 ReID、候选池/持仓恢复、动作推断和 Link AUC。
-6. 完成 Table 11 的 S2-S4：P1-P5 测试集前沿、三角色作用域回放、真实 portfolio trace 故障注入。
+6. 完成 Table S2-S4：P1-P5 测试集语义预算、三角色作用域回放、真实 portfolio trace 故障注入。
 7. 为主要 rate 报告 95% CI；金融序列采用 paired moving-block bootstrap，不能把交易日当独立样本做普通 t-test。
 
 ### P1: COLING 完整性所需
 
-8. 在 NLPCC 主平台完成 Table 7 的四个机制变体和 Table 11 的四项正式补充。
+8. 在 NLPCC 主平台完成 Table S1-S5 的五项正交补充实验。
 9. 运行 Adaptive，并只在开发集标定、测试集报告。
 10. 记录 detector/planner/auditor 调用、缓存、probe、GPU 显存/能耗和 API 成本。
 11. 只有 S1-S4 完成后，才把同一协议迁移到 StockBench/FinVault；迁移结果单独成表，不与 NLPCC 硬平均。

@@ -182,11 +182,11 @@ FinScope P3 的自然运行执行成功率为 99.2%（241/243）；干净输出�
 
 | Benchmark x Base LM 单元 | 状态 | 当前可报告结果 |
 | --- | --- | --- |
-| NLPCC x Qwen3.8-27B | **完成** | 六方法、P1-P5、公开侧信息 oracle、故障注入、10,000 次 paired block bootstrap |
-| StockBench x Qwen3.8-27B | 运行中 | 仅 Vanilla 完成：Return 4.24%、Sortino 2.253、MDD 2.43%、Sharpe 1.679、ReID@1 100%、Link AUC 1.000、E2E p95 253.267 s |
+| NLPCC x Qwen3.8-27B | **旧版 preliminary** | deterministic local-agent 结果仅用于工程回归；严格 ≤4B 本地 Agent 正式单元待重跑 |
+| StockBench x Qwen3.8-27B | **重跑中断，待重启** | 旧 Vanilla 与 502 期间中间产物均不进入正式结果 |
 | 其余 StockBench/FinVault 与其他基座模型 | 未形成最终单元 | 不写入正式比较结论 |
 
-当前完成度为 `1/9` 个 Benchmark x Base LM 完整单元。NLPCC x Qwen3.8-27B 足以证明端到端闭环可以运行，并给出首个隐私—效用—恢复—成本证据；它不足以支持跨 Benchmark、跨模型泛化。StockBench 正在运行的方法和 FinVault 的任何中间值都不得当作最终结果或填入论文主表。
+当前没有一个符合新协议的 Benchmark x Base LM 完整单元可作为最终主表结果。旧版 NLPCC 只能证明工程闭环曾经运行，不足以支持隐私 Agent 的论文结论；StockBench 的 502 中间值和 FinVault 中间值均不得当作最终结果或填入论文主表。
 
 完整逐日记录、置信区间、成本诊断和大主表见 [`coling_story_experiment_tables.md`](coling_story_experiment_tables.md)，正式机器可读结果位于 `benchmarks/results/*_final.json`。
 

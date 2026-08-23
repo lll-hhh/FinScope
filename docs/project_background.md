@@ -243,7 +243,7 @@ FAL（Financial Association Leakage）可以作为报告总称，但在定义权
 - static privacy vs adaptive privacy；
 - `benchmarks/local_privacy_models.json` 中的 10 个 ≤4B instruction-tuned 本地模型：Qwen3.5-0.8B/2B/4B、Qwen3-0.6B/1.7B、Llama-3.2-1B/3B-Instruct、Gemma-3-1B/4B-it 和 Gemma-4-4B-it。
 
-本地模型消融和 B1 完整性补充统一固定在 NLPCC 2026 Track 1 public A-set：前 20 个交易日用于模型选择和 Adaptive 标定，剩余交易日用于正式报告；任务模型固定为 Qwen3.8-27B。正式补充只包括 10-model 消融、P1-P5 披露前沿、research/risk/trade 三角色作用域回放和真实 portfolio trace 恢复故障注入。双资产 smoke、synthetic portfolio 和单元测试不作为论文证据。
+本地模型消融和 B1 完整性补充统一固定在 NLPCC 2026 Track 1 public A-set：前 20 个交易日用于模型选择和 Adaptive 标定，剩余交易日用于正式报告；任务模型固定为 Qwen3.8-27B。正式补充只包括本地模型选型、P1-P5 语义预算、research/risk/trade 三角色作用域回放、真实 portfolio trace 恢复故障注入和组件机制消融。双资产 smoke、synthetic portfolio 和单元测试不作为论文证据。
 
 需要隔离的变量包括：代号轮换范围、资产/动作/关系的保护等级、删除/替换/泛化策略、攻击强度、重试次数、候选池规模、基座模型和扫描门控模式。
 

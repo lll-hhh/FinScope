@@ -61,6 +61,7 @@ ALIAS_PATTERN = re.compile(
     r"(?<![A-Za-z0-9_])(?:GA|EA)_[A-Z]+_[A-F0-9]{10}(?![A-Za-z0-9_])",
     re.IGNORECASE,
 )
+REWRITE_MAX_TOKENS = 1024
 
 
 STOCK_PROFILES: Mapping[str, Tuple[str, str, str]] = {
@@ -569,7 +570,13 @@ class PrivacyController:
                 {"role": "user", "content": prompt},
             ],
             "temperature": 0,
-            "max_tokens": min(int(payload.get("max_tokens") or 4096), 4096),
+            # A rewrite is a preprocessing baseline, not an open-ended prose
+            # generation.  Keeping its budget bounded prevents a verbose
+            # rewriter from exhausting the task-model service's KV cache.
+            "max_tokens": min(
+                int(payload.get("max_tokens") or REWRITE_MAX_TOKENS),
+                REWRITE_MAX_TOKENS,
+            ),
             "stream": False,
         }
         started = time.perf_counter()

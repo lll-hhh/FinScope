@@ -71,7 +71,7 @@ FinScope 解决一个很具体的问题：金融 Agent 需要把新闻、行情�
 - 本地 Qwen3.8-27B、企业 DeepSeek V4 Flash、GLM-5.1 的 OpenAI-compatible 配置；
 - 49 项离线测试，不需要模型服务器和 API 即可运行。
 
-目前已完成 `NLPCC 2026 Track 1 public A-set × Qwen3.8-27B` 的 2025 全年重放，公开的聚合结果见 [`benchmarks/results/nlpcc_real_2025_qwen38_p3.md`](benchmarks/results/nlpcc_real_2025_qwen38_p3.md)。这不是官方榜单提交；三基座、三 benchmark 的完整矩阵以及主动隐私攻击仍待运行。逐日匿名输出、本地恢复 action 和映射 ground truth 不提交，只保留在实验服务器。
+仓库中保留的 `NLPCC 2026 Track 1 public A-set × Qwen3.8-27B` 全年结果来自旧版 deterministic local-agent，只能作为工程参考，不能作为当前论文结果。严格协议要求 Qwen3.8-27B 只做任务模型、≤4B 小模型做本地隐私 Agent；这套正式全年重跑和三基座/三 benchmark 矩阵仍在实验服务器执行。逐日匿名输出、本地恢复 action 和映射 ground truth 不提交，只保留在实验服务器。
 
 ## 4. 五分钟运行离线演示
 
@@ -315,16 +315,17 @@ trace = adapter.close_episode("20250102-track1")
 
 输出三张主表：金融/正常任务效用表、隐私攻击表、恢复连续性与成本表。不同 benchmark 的原生分数不能硬平均；共用指标可以按 benchmark 分组报告。
 
-### E2-E5 NLPCC 单平台正式补充实验
+### E2-E6 NLPCC 单平台正式补充实验
 
-为了让补充实验直接服务 B1 主线，E2-E5 全部固定在 NLPCC 2026 Track 1 public A-set：官方 DataLoader、2025 年真实交易日、11 个候选资产、Qwen3.8-27B 任务模型和 Table 10 选出的本地模型。前 20 个交易日只用于模型选择/Adaptive 标定，后续交易日用于正式报告。
+为了让补充实验直接服务 B1 主线，E2-E6 全部固定在 NLPCC 2026 Track 1 public A-set：官方 DataLoader、2025 年真实交易日、11 个候选资产、Qwen3.8-27B 任务模型和 Table S1 选出的本地模型。前 20 个交易日只用于模型选择/Adaptive 标定，后续交易日用于正式报告。补充表不重复主表的 Benchmark 原生分数、ReID/Link、Restore/Unsafe 或 Token/p95。
 
-- **E2 本地小模型消融：** 按 `benchmarks/local_privacy_models.json` 跑完 10 个不超过 4B 的 instruction-tuned 模型；比较严格 planner valid、recognizer/auditor failure、fallback、token/p95、NLPCC Valid 和 Sharpe。主模型先按严格成功率和成本预注册选择，不能用测试收益反选。
-- **E3 P1-P5 披露前沿：** 固定选定小模型，只改变 P1/P2/P3/P4/P5；报告 Sharpe、Return、MDD、ReID@1、Link AUC、Exact Restore 和 Unsafe Repair，回答语义信息量如何改变隐私和金融效用。
-- **E4 三角色作用域回放：** 在每个真实交易日让 research/risk/trade 三个逻辑角色共享同一 scope，换日轮换；比较 Global Alias、Episode Alias 和 FinScope 的同日绑定一致性、跨日 Link AUC、旧句柄拒绝和工作流完成率。
-- **E5 真实 trace 恢复安全：** 从已接受的 FinScope 模型输出和对应 portfolio state 生成截断、伪造、过期、同类交换、schema/numeric 越界扰动，再走 NLPCC action 执行器；报告 Exact Restore、Correct Reject、Unsafe Repair、State Equivalence 和执行中断率。
+- **E2 本地小模型消融：** 按 `benchmarks/local_privacy_models.json` 跑完 10 个不超过 4B 的 instruction-tuned 模型；只比较严格 planner valid、recognizer/auditor failure、fallback、repair、调用次数和本地 p95，按预注册规则锁定主模型。
+- **E3 P1-P5 语义预算：** 固定选定小模型，只改变 P1/P2/P3/P4/P5；只记录允许字段、外发语义 token、验证器拒绝、repair、cache 和交易升级，不复制主表的效用或攻击分数。
+- **E4 三角色作用域回放：** 在每个真实交易日让 research/risk/trade 三个逻辑角色共享同一 scope，换日轮换；只比较同日绑定一致性、跨 scope 句柄复用、旧句柄拒绝、角色权限和轮换完成率。
+- **E5 真实 trace 恢复安全：** 从已接受的 FinScope 模型输出和对应 portfolio state 生成截断、伪造、过期、同类交换、schema/numeric 越界扰动；只报告 reason-code 覆盖、状态等价、交易中断和人工升级。
+- **E6 组件机制消融：** 固定数据、任务模型和 P3，分别去掉语义 planner、scope rotation、security-master validation 或 restoration auditor；报告各组件捕获的安全事件类型和交易前 gate 覆盖率。
 
-双资产 smoke、单元测试和 synthetic portfolio 只用于工程回归，不进入 E2-E5 的论文百分比。
+双资产 smoke、单元测试和 synthetic portfolio 只用于工程回归，不进入 E2-E6 的论文百分比。
 
 ### E6 隐私攻击
 

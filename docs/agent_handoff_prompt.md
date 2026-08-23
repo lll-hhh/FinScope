@@ -85,7 +85,7 @@
 4. trace schema：匿名外发 trace、本地映射 ground truth、恢复和执行结果分离；
 5. Vanilla vs FinScope smoke：仅作为工程检查，验证任务完成、工具参数恢复、action 合法、scope 内 alias 一致、换日后 alias 轮换；
 6. 按固定 20 日开发窗口跑完 10 个小模型，锁定本地主模型后再打开测试窗口；
-7. 只有上述产物通过后，才开始 Table 11 的 P1-P5、三角色作用域回放和真实 trace 故障注入。
+7. 只有上述产物通过后，才开始 Table S2-S4 的 P1-P5 语义预算、三角色作用域回放和真实 trace 故障注入。
 
 六、攻击与评测先按 B1 特性设计
 
@@ -97,13 +97,13 @@
 
 成本报告：本地 detector 调用/跳过/probe、p50/p95 本地延迟、外部 token、外部调用次数、重试次数和端到端 p50/p95。
 
-主表对照包括 Vanilla、direct deletion、LLM rewrite、global fixed alias、episode alias 和 FinScope；NLPCC 正式机制补充只包括 handles-only + scope rotation、无 security-master validation 和无 restoration auditor。always-scan、cache、probe 等仅作成本诊断，不单独包装成论文探针。不要同时改变模型、数据、候选池和 alias 策略，否则无法解释结果。
+主表对照包括 Vanilla、direct deletion、LLM rewrite、global fixed alias、episode alias 和 FinScope；NLPCC 正式补充固定为本地模型选型、P1-P5 语义预算、三角色作用域生命周期、真实 trace 恢复故障和组件机制消融。always-scan、cache、probe 等只有在 Table S1/S2 的本地开销或语义预算中作为诊断列，不单独包装成论文探针。不要同时改变模型、数据、候选池和 alias 策略，否则无法解释结果。
 
 七、正式补充实验的统一平台
 
 所有论文补充实验固定在 NLPCC 2026 Track 1 public A-set：Qwen3.8-27B 任务模型、官方 DataLoader、11 个候选资产和同一回测执行器。前 20 个交易日是开发集，其余交易日是正式测试集。
 
-正式补充只包括：10-model 本地 Agent 消融、P1-P5 隐私-效用前沿、research/risk/trade 三角色作用域回放、真实 portfolio trace 恢复故障注入。双资产 smoke、synthetic portfolio、单元测试和 always-scan/cache probe 只能作为工程诊断，不得填入论文主补充表。
+正式补充只包括：10-model 本地 Agent 选型、P1-P5 语义预算、research/risk/trade 三角色作用域回放、真实 portfolio trace 恢复故障注入和组件机制消融。双资产 smoke、synthetic portfolio、单元测试和 always-scan/cache probe 只能作为工程诊断，不得填入论文主补充表。
 
 八、工程和安全规则
 

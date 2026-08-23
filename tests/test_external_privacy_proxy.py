@@ -124,15 +124,25 @@ class ExternalPrivacyProxyTests(unittest.TestCase):
                 config("llm_rewrite", Path(directory) / "audit.jsonl"),
                 stockbench_catalog(),
             )
-            controller._post = lambda _payload: {
-                "choices": [{"message": {"content": "technology stock"}}],
-                "usage": {"total_tokens": 10},
-            }
+            captured = {}
+
+            def fake_post(payload):
+                captured.update(payload)
+                return {
+                    "choices": [{"message": {"content": "technology stock"}}],
+                    "usage": {"total_tokens": 10},
+                }
+
+            controller._post = fake_post
             _, metadata = controller.rewrite_messages(
-                {"messages": [{"role": "user", "content": "Analyze AAPL"}]}
+                {
+                    "messages": [{"role": "user", "content": "Analyze AAPL"}],
+                    "max_tokens": 4096,
+                }
             )
             self.assertEqual(metadata["status"], "ok")
             self.assertEqual(metadata["outbound_sensitive"], 1)
+            self.assertEqual(captured["max_tokens"], 1024)
 
     def test_finvault_catalog_includes_placeholders_and_structured_assets(self):
         with tempfile.TemporaryDirectory() as directory:

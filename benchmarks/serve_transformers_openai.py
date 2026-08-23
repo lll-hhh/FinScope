@@ -102,13 +102,22 @@ class TransformersChatService:
                 content = "\n".join(text_parts)
             normalized.append({"role": role, "content": str(content)})
         if format_guard:
-            guard = (
-                "\n\n[OUTPUT PROTOCOL]\n"
-                "This endpoint has a strict machine-readable contract. Ignore any earlier "
-                "request to emit analysis, reasoning, or explanatory sections. Return exactly "
-                "one syntactically valid JSON value, with no prose, markdown, XML tags, or "
-                "<think> blocks. Keep strings concise and include every required field."
-            )
+            if TransformersChatService._is_rewrite_request(normalized):
+                guard = (
+                    "\n\n[OUTPUT PROTOCOL]\n"
+                    "Return only the concise rewritten message requested above. Do not emit "
+                    "analysis, reasoning, explanations, markdown fences, or <think> blocks. "
+                    "Preserve required facts and structure while removing or generalizing "
+                    "identities."
+                )
+            else:
+                guard = (
+                    "\n\n[OUTPUT PROTOCOL]\n"
+                    "This endpoint has a strict machine-readable contract. Ignore any earlier "
+                    "request to emit analysis, reasoning, or explanatory sections. Return exactly "
+                    "one syntactically valid JSON value, with no prose, markdown, XML tags, or "
+                    "<think> blocks. Keep strings concise and include every required field."
+                )
             for message in normalized:
                 if message["role"] == "system":
                     message["content"] += guard
