@@ -313,7 +313,7 @@ trace = adapter.close_episode("20250102-track1")
 
 对 NLPCC、StockBench、FinVault 分别运行 Vanilla、Deletion、LLM Rewrite、Global Fixed Alias、Episode Alias、FinScope；金融模型分别使用 Qwen3.8-27B、DeepSeek V4 Flash、GLM-5.1。固定 prompt、temperature、数据切分、Agent 工具、随机种子和预算。至少 3 个独立种子；连续交易任务还要报告不同市场时间窗，而不是只跑最好的一段。
 
-输出三张主表：金融/正常任务效用表、隐私攻击表、恢复连续性与成本表。不同 benchmark 的原生分数不能硬平均；共用指标可以按 benchmark 分组报告。
+正文只输出一张 `Benchmark × Base LM × Method` 大主表：每行按 benchmark 放四个原生指标，并追加统一的隐私、恢复和成本指标。S1-S5 是固定在 NLPCC 上、与主表列正交的补充实验；不同 benchmark 的原生分数不能硬平均。
 
 ### E2-E6 NLPCC 单平台正式补充实验
 

@@ -230,7 +230,7 @@ Global Fixed Alias 作为经典 pseudonym 控制保留；Deletion 和 Vanilla �
 - **当前主攻击者不是语言模型。** `ReID@1` 和 `Link AUC` 由确定性的公开证券主表与行情属性匹配 oracle 计算；它不调用 Qwen、DeepSeek 或 GLM，因此与任务模型独立，所有方法面对完全相同的攻击规则和侧信息。
 - **FinVault 的主攻击同样不需要攻击模型。** Benchmark 提供固定的对抗提示，由作为 victim 的任务模型响应并调用沙箱工具；`Attack Success` 衡量这些提示是否诱导任务模型触发危险状态。只有生成或改写新攻击提示时才需要单独的 attacker model。
 - **LLM attacker 是单独的敏感性实验。** 后续分别使用 Qwen、DeepSeek 和 GLM 读取相同匿名 trace，并显式记录 `victim_model`、`attacker_model`、候选池、查询预算和公开侧信息。即使两者都选 Qwen，也必须作为两个独立角色和调用统计，不能写成“任务模型自己攻击自己”。
-- 主表中的当前攻击结果必须标注 `attacker=public-side-information oracle`；模型攻击结果只进入攻击强度补充表，不能替换 oracle 主结果。
+- 主表中的当前攻击结果必须标注 `attacker=public-side-information oracle`；模型攻击结果不进入 S1-S5，只在附录敏感性分析中单独记录，不能替换 oracle 主结果。
 
 ## 5. 补充实验表格
 
