@@ -314,17 +314,9 @@ trace = adapter.close_episode("20250102-track1")
 
 对 NLPCC、StockBench、FinVault 分别运行 Vanilla、Deletion、LLM Rewrite、Global Fixed Alias、Episode Alias、FinScope；金融模型分别使用 Qwen3.8-27B、DeepSeek V4 Flash、GLM-5.1。固定 prompt、temperature、数据切分、Agent 工具、随机种子和预算。至少 3 个独立种子；连续交易任务还要报告不同市场时间窗，而不是只跑最好的一段。
 
-正文只输出一张 `Benchmark × Base LM × Method` 大主表：每行按 benchmark 放四个原生指标，再放 `Decision Preservation + Reference Continuity + Exact Action Restore + ReID@1 + Link AUC + Token Delta + E2E p95`。`Unsafe Repair` 只放故障注入补表。S1-S5 是固定在 NLPCC 上、与主表列正交的补充实验；不同 benchmark 的原生分数不能硬平均。
+正文只输出一张 `Benchmark × Base LM × Method` 大主表：每行按 benchmark 放四个原生指标，再放统一的隐私、安全和成本指标。不同 benchmark 的原生分数不能硬平均。当前确定的三组八项补充实验及完整表格见 [`docs/coling_supplemental_experiments.md`](docs/coling_supplemental_experiments.md)：动态披露三项、长程替换与效用保持三项、本地小模型选择一项、主方法组件消融一项。
 
-### E2-E6 NLPCC 单平台正式补充实验
-
-为了让补充实验直接服务 B1 主线，E2-E6 全部固定在 NLPCC 2026 Track 1 public A-set：官方 DataLoader、2025 年真实交易日、11 个候选资产、Qwen3.8-27B 任务模型和 Table S1 选出的本地模型。前 20 个交易日只用于模型选择/Adaptive 标定，后续交易日用于正式报告。补充表不重复主表的 Benchmark 原生分数、ReID/Link、Restore/Unsafe 或 Token/p95。
-
-- **E2 本地小模型消融：** 按 `benchmarks/local_privacy_models.json` 跑完 10 个不超过 4B 的 instruction-tuned 模型；只比较严格 planner valid、recognizer/auditor failure、fallback、repair、调用次数和本地 p95，按预注册规则锁定主模型。
-- **E3 P1-P5 语义预算：** 固定选定小模型，只改变 P1/P2/P3/P4/P5；只记录允许字段、外发语义 token、验证器拒绝、repair、cache 和交易升级，不复制主表的效用或攻击分数。
-- **E4 三角色作用域回放：** 在每个真实交易日让 research/risk/trade 三个逻辑角色共享同一 scope，换日轮换；只比较同日绑定一致性、跨 scope 句柄复用、旧句柄拒绝、角色权限和轮换完成率。
-- **E5 真实 trace 恢复安全：** 从已接受的 FinScope 模型输出和对应 portfolio state 生成截断、伪造、过期、同类交换、schema/numeric 越界扰动；只报告 reason-code 覆盖、状态等价、交易中断和人工升级。
-- **E6 组件机制消融：** 固定数据、任务模型和 P3，分别去掉语义 planner、scope rotation、security-master validation 或 restoration auditor；报告各组件捕获的安全事件类型和交易前 gate 覆盖率。
+补充实验全部固定在 NLPCC 2026 Track 1 public A-set；前 20 个交易日只用于小模型选择和动态策略标定，其他交易日用于正式报告。它们不把主表的 54 个单元重新拆成重复 baseline，而是分别解释动态选择、长程变化和组件作用。
 
 双资产 smoke、单元测试和 synthetic portfolio 只用于工程回归，不进入 E2-E6 的论文百分比。
 
