@@ -71,6 +71,59 @@ FinScope 不是只优化一个隐私分数，而是同时考察四类目标：
 - **RQ3：** 外部模型输出能否被准确恢复为真实工具参数和金融动作；在句柄损坏、伪造、交换、过期和歧义时能否正确拒绝？
 - **RQ4：** 上述能力在 NLPCC、StockBench 和 FinVault 的连续工作流中带来多少 token、时延、重试和任务效用开销？
 
+### 3.5 B1 的科学核心：受约束的金融实体指称一致性
+
+B1 不把研究对象定义为“一个本地服务是否能调用成功”，而定义为一个带状态的约束问题。设真实金融实体为 `e`，Agent 角色为 `r`，作用域为 `s=(task, conversation, trading_day)`，本地 Agent 必须产生受保护表示 `z_s(e)=(h_s(e), d_s(e))`，其中 `h` 是只用于恢复的句柄，`d` 是经过 security master 验证的语义描述。一个表示只有在下面四个条件同时满足时才是可接受的：
+
+1. **任务内一致性：** 对同一 `s` 内的 research、risk、trade 和 tool 节点，`h_s(e)` 必须唯一且指向同一个 canonical entity；
+2. **作用域外隔离：** 对不同交易日或不同任务，句柄不能被直接复用，旧映射必须失效；
+3. **语义充分性：** `d_s(e)` 只包含当前 role/purpose 所需的最小金融事实，不能因过度泛化而使候选资产或动作不可判定；
+4. **执行可证明性：** 外部模型返回的结果必须能恢复到唯一实体和合法 action；无法证明时必须拒绝，而不是选择一个“最像”的证券。
+
+因此，FinScope 的核心不是模块拼装，而是求解一个“语义披露—作用域绑定—动作恢复”的联合约束：
+
+```text
+minimize   disclosure(e, role, purpose) + online_cost
+subject to intra_scope_consistency = 1
+           stale_or_cross_scope_reuse = 0
+           restored_action == canonical_action
+           invalid_or_ambiguous_action => reject
+           task_utility >= required_threshold
+```
+
+这给 B1 一个明确的学术对象：**privacy-constrained reference consistency for financial multi-agent execution**。金融性来自 canonical security master、portfolio state、交易动作和跨日市场轨迹；多智能体性来自多个角色共享同一 scope；算法性来自 role-conditioned disclosure selection、scope-aware binding 和 state-aware constrained restoration，而不是来自“启动了几个服务”。
+
+### 3.6 方法应如何算法化
+
+FinScope 可在论文中写成一个本地约束求解器/状态机，而不是普通 middleware：
+
+1. **Role-conditioned disclosure planner：** 根据 `role`、`purpose`、动作类型和 security master，从 P1-P5 字段集合中选择最小合法描述；模型只能提出候选字段，验证器决定是否接受；
+2. **Scope-consistent binding：** 使用 `(scope, entity_type, canonical_id)` 建立唯一绑定，句柄由本地密钥和 scope 派生并在交易日轮换；同一 scope 的多个 Agent 读取同一绑定表；
+3. **Constrained restoration transducer：** 解析句柄、JSON 结构、动作和数值，恢复到 canonical entity 后执行类型、候选池、持仓和现金约束；
+4. **Fail-closed auditor：** 对未知、过期、缺失、类型冲突和歧义输出产生可审计 reason code，阻止提交；安全代码拥有最终权限，模型不能创建句柄、修改映射或绕过验证。
+
+其中的科学变量是披露级别、scope 生命周期、角色权限和验证器组件；可以通过 S2-S5 的受控消融检验每个约束的必要性。
+
+### 3.7 本地 Agent 是否需要训练
+
+当前实现**没有把 Qwen3.5-2B 重新训练成金融模型**。本地模型是一个候选生成器：负责残余实体识别、语义字段规划和审计意见；security master、绑定表、恢复器和执行门控是确定性可信组件。这样做是有意的：即使小模型失败、幻觉或被提示注入，错误也只能导致 `reject/fallback-to-safe-fields`，不能获得真实映射权限。
+
+论文第一版不应声称“训练了一个隐私 Agent”。更准确的表述是：**a pretrained small LM is used as a proposal policy under a deterministic verifier**。模型优化先通过 JSON schema、短输出协议、角色条件 prompt、缓存和本地 p95 控制；用严格 planner validity、recognizer/auditor failure、planner repair、whole fallback 和安全事件捕获率选择模型，而不能用测试集收益反选。
+
+若后续需要增加学习成分，可以在不改变信任边界的前提下做两种可控扩展：用 security-master 生成的合法/非法描述对 planner 做 LoRA 或蒸馏；用真实 trace 故障标签训练 auditor。训练目标只优化候选质量和拒绝召回率，不能训练模型直接预测或生成 canonical mapping。这样“模型学习、代码证明、交易执行”三者职责清晰。
+
+### 3.8 Security master 的事实给谁看
+
+security master 不是一份直接发给外部模型的股票字典，而是本地 Agent 的可信事实源。汇报中应明确画出三层信息边界：
+
+| 组件 | 可以看到的内容 | 不能看到/不能执行的内容 |
+| --- | --- | --- |
+| 本地 FinScope Agent | 完整 canonical ID、证券名称、行业、市场、规模、候选池、scope 映射和 portfolio/tool 约束 | 不负责替代任务模型做投资决策 |
+| 外部任务模型（Qwen/DeepSeek/GLM） | 经过验证的最小语义描述、类型化句柄、必要的行情/新闻事实和任务 schema | 完整 security master、真实映射表、旧 scope 映射和本地执行权限 |
+| 本地恢复器/执行器 | 外部返回的句柄、动作和数值；本地 canonical entity、portfolio state 和业务规则 | 不接受模型自行创建的句柄或未经验证的动作 |
+
+所以 security master 的作用不是“把所有证券事实提供给模型”，而是**先在本地验证候选，再只释放当前任务所需的事实字段**。例如研究 Agent 可能只得到“美国大型软件股 + 当前任务允许的行情特征 + `FS_ASSET_*` 句柄”；交易执行前，本地恢复器才把句柄解析为真实 ticker，并检查持仓、现金、方向和数量。这样既回答了“事实给谁”，也把 B1 与 A1 分开：A1 决定哪些信息可以被保护/披露，B1 保证这些受保护信息在金融工作流中可一致恢复和安全执行。
+
 ## 4. 创新点
 
 以下贡献应写成 FinScope 的金融运行时闭环，不应把 A1 的去标识化/P1-P5，或已有的替换、句柄和输出恢复单独声称为 B1 创新。
@@ -252,6 +305,55 @@ FinHarness 是金融领域最直接的安全近邻。它使用 Query Monitor、T
 | **B1：FinScope（本文）** | **接收 A1/共享模块的 P1-P5 受保护金融描述，并验证其证券事实** | **独立本地 Agent 在研究—风险—交易—工具节点间维护任务/会话/交易日级绑定** | **确定性恢复 canonical entity、权重和动作；审计歧义、伪造、过期和句柄交换** | **恢复后状态校验、工具参数校验、交易前 fail-closed，并评测执行连续性** |
 
 这张表表达的是研究交叉点，而不是声称 FinScope 的每个组件都是首次提出。现有文本隐私工作集中在第一列和第三列；通用 Agent 隐私工作集中在前两列或第四列；金融多智能体工作集中在第二列和第四列。当前没有一项既有工作同时覆盖 B1 所需的四列，并把第三列的恢复错误作为金融执行风险进行评测。
+
+### 9.3 相关工作对照矩阵（★=核心支持，△=部分涉及，—=未涉及）
+
+这张矩阵不按“功能越多越先进”排序，而按 B1 的五个必要条件检查：是否金融、是否多 Agent、是否做语义保护、是否维护跨角色/跨作用域指称、是否把恢复结果送入真实金融执行约束。它解释了为什么通用隐私工作不能直接替代 B1，也解释了为什么金融多 Agent 工作本身还缺少本问题。
+
+| 工作 | 金融场景 | 多 Agent 工作流 | 语义/隐私披露 | 跨角色同一实体绑定 | 跨日/作用域生命周期 | 本地确定性恢复 | 金融动作/状态校验 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| HaS [1] | — | — | ★ | △ | — | ★ | — |
+| Casper [2] | — | — | ★ | △ | — | ★ | — |
+| PAPILLON [3] | — | △ | ★ | — | — | △ | — |
+| Portcullis [4] | — | △ | ★ | — | △ | △ | — |
+| PromptGraph [5] | — | △ | ★ | ★ | △ | ★ | — |
+| PrivacyAsst [6] | — | △ | ★ | — | △ | — | ★ |
+| MAGPIE [7] | — | ★ | ★ | △ | △ | — | — |
+| Privacy-R1 [8] | — | ★ | ★ | △ | △ | — | — |
+| OCELOT [9] | — | △ | ★ | — | ★ | — | △ |
+| MNC [10] | — | ★ | ★ | ★ | ★ | △ | △ |
+| SecureClaw [11] | — | △ | ★ | △ | ★ | ★ | ★ |
+| RTBAS [12] | — | △ | △ | — | △ | — | ★ |
+| FinCon [13] | ★ | ★ | — | ★ | △ | — | ★ |
+| FinRobot [14] | ★ | ★ | — | △ | △ | — | ★ |
+| TradingAgents [15] | ★ | ★ | — | ★ | △ | — | ★ |
+| FinHarness [16] | ★ | △ | △ | — | ★ | — | ★ |
+| **FinScope（本文）** | **★** | **★** | **★** | **★** | **★** | **★** | **★** |
+
+矩阵中的“★”只表示该问题是工作的核心研究对象，不表示论文一定实现了全部工程功能；“△”表示存在相邻机制或评测。FinScope 的可辩护交叉点不是“第一次使用匿名化、句柄或监控”，而是把**证券事实约束、跨角色指称一致性、跨日生命周期、恢复安全和金融状态执行**放进同一个可验证问题中。
+
+### 9.4 明天汇报可直接使用的故事链
+
+可以用四句话讲完，不要从“我们有多少模块”开始：
+
+```text
+金融多智能体每天会让研究、风控和交易 Agent 反复讨论同一资产，但外部模型不应持续看到真实证券身份。
+如果每天重新匿名，多个 Agent 会把同一资产当成不同对象；如果长期固定代号，跨日行情和交易轨迹又会暴露身份。
+更危险的是，语言模型返回的句柄、资产或权重一旦被错误恢复，错误会直接进入查询、持仓或交易状态。
+因此我们研究：如何由一个本地 Agent 选择最小必要金融语义，并维护作用域一致的绑定，在外部推理后证明恢复动作合法，否则在交易前拒绝。
+```
+
+箭头版：
+
+```text
+金融隐私保护
+  -> 同一资产在研究/风控/交易之间必须保持一致
+  -> 下一交易日又必须切断旧身份链接
+  -> 输出恢复错误不能进入金融执行
+  -> FinScope：语义选择 + scope binding + audited restoration + fail-closed
+```
+
+这里的金融专属性要用具体后果说明：`AAPL` 被错误恢复成 `AMZN` 不是普通文本错误，而是会改变行情查询、持仓归因、权重更新和订单标的。这个“指称错误会改变金融状态”的因果链，才是 B1 相对于一般 prompt privacy 的价值。
 
 ## 10. 新颖性审计
 
