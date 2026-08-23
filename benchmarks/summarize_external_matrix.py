@@ -268,6 +268,44 @@ def finvault_native(attack_path: Path, normal_path: Path) -> Dict[str, Any] | No
     }
 
 
+def latest_finvault_artifacts(
+    results_root: Path, method: str
+) -> tuple[Path | None, Path | None]:
+    """Find the newest attack/normal pair for a method.
+
+    Current runs include the privacy-agent tag in the filename (for example,
+    ``..._qwen35_2b_privacy_attacks_final.json``).  The untagged pattern is
+    retained for compatibility with older completed runs.
+    """
+
+    pairs: Dict[str, Dict[str, Path]] = {}
+    for kind in ("attacks", "normal"):
+        for path in results_root.glob(
+            f"finvault_qwen38_{method}_*_{kind}_final.json"
+        ):
+            tag = path.name.removeprefix(f"finvault_qwen38_{method}_")
+            tag = tag.removesuffix(f"_{kind}_final.json")
+            pairs.setdefault(tag, {})[kind] = path
+        legacy = results_root / f"finvault_qwen38_{method}_{kind}_final.json"
+        if legacy.is_file():
+            pairs.setdefault("", {})[kind] = legacy
+    complete = [
+        pair
+        for pair in pairs.values()
+        if pair.get("attacks") is not None and pair.get("normal") is not None
+    ]
+    if not complete:
+        return None, None
+    selected = max(
+        complete,
+        key=lambda pair: min(
+            pair["attacks"].stat().st_mtime,
+            pair["normal"].stat().st_mtime,
+        ),
+    )
+    return selected["attacks"], selected["normal"]
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--run-root", type=Path, required=True)
@@ -294,9 +332,12 @@ def main() -> None:
             if benchmark == "stockbench":
                 native = stock_native(latest_stock_metrics(args.stockbench_root, method))
             else:
+                attack_path, normal_path = latest_finvault_artifacts(
+                    args.results_root, method
+                )
                 native = finvault_native(
-                    args.results_root / f"finvault_qwen38_{method}_attacks_final.json",
-                    args.results_root / f"finvault_qwen38_{method}_normal_final.json",
+                    attack_path,
+                    normal_path,
                 )
             rows.append(
                 {

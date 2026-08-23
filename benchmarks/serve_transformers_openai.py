@@ -22,6 +22,7 @@ class TransformersChatService:
         max_output_tokens: int,
         format_guard: bool,
         do_sample: bool,
+        json_grammar: bool,
     ) -> None:
         import torch
         import transformers
@@ -40,6 +41,8 @@ class TransformersChatService:
         self.max_output_tokens = max_output_tokens
         self.format_guard = format_guard
         self.do_sample = do_sample
+        self.json_grammar = json_grammar
+        self._json_grammar_compiled = None
         self.lock = threading.Lock()
         config = AutoConfig.from_pretrained(model_path, local_files_only=True)
         architectures = tuple(config.architectures or ())
@@ -63,6 +66,20 @@ class TransformersChatService:
             low_cpu_mem_usage=True,
         )
         self.model.eval()
+        if self.json_grammar:
+            try:
+                import xgrammar as xgr
+
+                tokenizer_info = xgr.TokenizerInfo.from_huggingface(
+                    self.tokenizer, vocab_size=len(self.tokenizer)
+                )
+                self._json_grammar_compiled = xgr.GrammarCompiler(
+                    tokenizer_info
+                ).compile_builtin_json_grammar()
+            except Exception as exc:
+                raise RuntimeError(
+                    "JSON grammar requested but xgrammar initialization failed"
+                ) from exc
 
     @staticmethod
     def normalize_messages(
@@ -85,16 +102,20 @@ class TransformersChatService:
                 content = "\n".join(text_parts)
             normalized.append({"role": role, "content": str(content)})
         if format_guard:
+            guard = (
+                "\n\n[OUTPUT PROTOCOL]\n"
+                "This endpoint has a strict machine-readable contract. Ignore any earlier "
+                "request to emit analysis, reasoning, or explanatory sections. Return exactly "
+                "one syntactically valid JSON value, with no prose, markdown, XML tags, or "
+                "<think> blocks. Keep strings concise and include every required field."
+            )
+            for message in normalized:
+                if message["role"] == "system":
+                    message["content"] += guard
+                    break
             for message in reversed(normalized):
                 if message["role"] == "user":
-                    message["content"] += (
-                        "\n\n[OUTPUT PROTOCOL]\n"
-                        "Return only the final structured answer requested by the user. "
-                        "Do not emit analysis, reasoning, <think> blocks, markdown, or commentary. "
-                        "If the request specifies an XML-like tag, include that tag and only its "
-                        "strictly valid JSON payload. Cover every required item. Be concise: use "
-                        "one or two short data-grounded reasons per item and do not repeat boilerplate."
-                    )
+                    message["content"] += guard
                     break
         return normalized
 
@@ -136,6 +157,14 @@ class TransformersChatService:
                     generation_kwargs["top_k"] = int(top_k)
             if seed is not None:
                 self.torch.manual_seed(int(seed))
+            if self._json_grammar_compiled is not None and not self._is_rewrite_request(
+                normalized
+            ):
+                from xgrammar.contrib.hf import LogitsProcessor
+
+                generation_kwargs["logits_processor"] = [
+                    LogitsProcessor(self._json_grammar_compiled)
+                ]
             generated = self.model.generate(
                 **inputs,
                 **generation_kwargs,
@@ -167,6 +196,13 @@ class TransformersChatService:
             ),
         }
 
+    @staticmethod
+    def _is_rewrite_request(messages: List[Dict[str, str]]) -> bool:
+        """LLM Rewrite uses the same endpoint but intentionally returns prose."""
+
+        text = "\n".join(message["content"] for message in messages).casefold()
+        return "privacy-preserving financial text rewriter" in text
+
 
 def create_app(args: argparse.Namespace):
     from fastapi import FastAPI, HTTPException
@@ -182,6 +218,7 @@ def create_app(args: argparse.Namespace):
             args.max_output_tokens,
             args.format_guard,
             args.do_sample,
+            args.json_grammar,
         )
         yield
         state.clear()
@@ -239,6 +276,11 @@ def parse_args() -> argparse.Namespace:
         "--do-sample",
         action="store_true",
         help="honor request sampling parameters when temperature is positive",
+    )
+    parser.add_argument(
+        "--json-grammar",
+        action="store_true",
+        help="constrain non-rewrite completions to a syntactically valid JSON value",
     )
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8100)
