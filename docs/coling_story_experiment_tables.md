@@ -162,12 +162,12 @@ Global Fixed Alias 作为经典 pseudonym 控制保留；Deletion 和 Vanilla �
 | NLPCC | GLM-5.1 | Global Alias | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
 | NLPCC | GLM-5.1 | Episode Alias | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
 | NLPCC | GLM-5.1 | FinScope P3 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| StockBench | Qwen3.8-27B | Vanilla | 4.24% | 2.253 | 2.43% | 1.679 | 100.00% | 1.000 | -- | -- | ref. | 253.267 s |
-| StockBench | Qwen3.8-27B | Deletion | TBD | TBD | TBD | TBD | TBD | TBD | -- | -- | TBD | TBD |
-| StockBench | Qwen3.8-27B | LLM Rewrite | TBD | TBD | TBD | TBD | TBD | TBD | -- | -- | TBD | TBD |
-| StockBench | Qwen3.8-27B | Global Alias | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| StockBench | Qwen3.8-27B | Episode Alias | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| StockBench | Qwen3.8-27B | FinScope P3 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| StockBench | Qwen3.8-27B | Vanilla | 4.24% | 2.253 | 2.43% | 1.679 | ref. | -- | -- | 100.00% | 1.000 | ref. | 253.267 s |
+| StockBench | Qwen3.8-27B | Deletion | 0.00% | 0.000 | 0.00% | 0.000 | TBD | -- | -- | 5.00% | 0.500 | -9.0% | 138.160 s |
+| StockBench | Qwen3.8-27B | LLM Rewrite | 0.00% | 0.000 | 0.00% | 0.000 | TBD | -- | -- | 100.00% | 1.000 | -7.5% | 103.934 s |
+| StockBench | Qwen3.8-27B | Global Alias | -1.75% | -0.111 | 12.17% | -0.096 | TBD | 100.00% | TBD | 5.00% | 1.000 | +2.5% | 157.332 s |
+| StockBench | Qwen3.8-27B | Episode Alias | -1.49% | -0.066 | 11.87% | -0.056 | TBD | 100.00% | TBD | 5.00% | 0.500 | +2.6% | 156.183 s |
+| StockBench | Qwen3.8-27B | FinScope P3 | 0.00% | 0.000 | 0.00% | 0.000 | TBD | 100.00% | TBD | 30.00% | 0.926 | +10.7% | 168.511 s |
 | StockBench | DeepSeek V4 Flash | Vanilla | TBD | TBD | TBD | TBD | TBD | TBD | -- | -- | ref. | TBD |
 | StockBench | DeepSeek V4 Flash | Deletion | TBD | TBD | TBD | TBD | TBD | TBD | -- | -- | TBD | TBD |
 | StockBench | DeepSeek V4 Flash | LLM Rewrite | TBD | TBD | TBD | TBD | TBD | TBD | -- | -- | TBD | TBD |
@@ -180,12 +180,12 @@ Global Fixed Alias 作为经典 pseudonym 控制保留；Deletion 和 Vanilla �
 | StockBench | GLM-5.1 | Global Alias | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
 | StockBench | GLM-5.1 | Episode Alias | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
 | StockBench | GLM-5.1 | FinScope P3 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| FinVault | Qwen3.8-27B | Vanilla | TBD | TBD | TBD | TBD | TBD | TBD | -- | -- | ref. | TBD |
-| FinVault | Qwen3.8-27B | Deletion | TBD | TBD | TBD | TBD | TBD | TBD | -- | -- | TBD | TBD |
-| FinVault | Qwen3.8-27B | LLM Rewrite | TBD | TBD | TBD | TBD | TBD | TBD | -- | -- | TBD | TBD |
-| FinVault | Qwen3.8-27B | Global Alias | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| FinVault | Qwen3.8-27B | Episode Alias | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| FinVault | Qwen3.8-27B | FinScope P3 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| FinVault | Qwen3.8-27B | Vanilla | 39.25% | 17.76% | 74.77% | 36.45% | ref. | -- | -- | 100.00% | 1.000 | ref. | 33.787 s |
+| FinVault | Qwen3.8-27B | Deletion | 36.45% | 14.02% | 78.50% | 39.25% | 83.96% | -- | -- | 1.59% | 0.859 | -5.9% | 44.169 s |
+| FinVault | Qwen3.8-27B | LLM Rewrite | 32.71% | 14.02% | 79.44% | 46.73% | 69.89% | -- | -- | 1.88% | 0.859 | +75.0% | 102.893 s |
+| FinVault | Qwen3.8-27B | Global Alias | 38.32% | 17.76% | 74.77% | 36.45% | 89.71% | N/A | TBD | 0.14% | 1.000 | +0.9% | 43.328 s |
+| FinVault | Qwen3.8-27B | Episode Alias | 37.38% | 15.89% | 76.64% | 38.32% | 89.04% | N/A | TBD | 0.14% | 0.500 | +0.0% | 44.770 s |
+| FinVault | Qwen3.8-27B | FinScope P3 | 24.30% | 5.61% | 84.11% | 53.27% | 83.65% | N/A | TBD | 1.59% | 0.859 | -27.8% | 233.134 s |
 | FinVault | DeepSeek V4 Flash | Vanilla | TBD | TBD | TBD | TBD | TBD | TBD | -- | -- | ref. | TBD |
 | FinVault | DeepSeek V4 Flash | Deletion | TBD | TBD | TBD | TBD | TBD | TBD | -- | -- | TBD | TBD |
 | FinVault | DeepSeek V4 Flash | LLM Rewrite | TBD | TBD | TBD | TBD | TBD | TBD | -- | -- | TBD | TBD |

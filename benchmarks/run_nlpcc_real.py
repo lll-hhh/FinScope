@@ -210,7 +210,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--privacy-model-name",
-        default="Qwen3.5-2B",
+        default="Qwen2.5-3B-Instruct",
         help="served model ID for the local privacy Agent",
     )
     parser.add_argument("--start-date", default="2025-01-02")

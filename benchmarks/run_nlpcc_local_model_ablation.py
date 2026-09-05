@@ -84,23 +84,28 @@ def summarize_result(document: Mapping[str, Any]) -> Dict[str, Any]:
         (row for row in document.get("main_table", []) if row.get("method") == "finscope"),
         {},
     )
-    counters = {
-        "planner_calls": 0,
-        "planner_successes": 0,
-        "planner_repairs": 0,
-        "planner_fallbacks": 0,
-        "recognizer_calls": 0,
-        "recognizer_failures": 0,
-        "recognizer_fallbacks": 0,
-        "auditor_calls": 0,
-        "auditor_failures": 0,
+    # ``LocalPrivacyAgent.get_metrics`` uses role-qualified names. Keep the
+    # compact names in the selection report, but map them explicitly here;
+    # silently reading missing keys would make every model look unmeasured
+    # and could select a failed model by latency alone.
+    metric_keys = {
+        "planner_calls": "disclosure_planner_calls",
+        "planner_successes": "disclosure_planner_successes",
+        "planner_repairs": "disclosure_planner_repairs",
+        "planner_fallbacks": "disclosure_planner_fallbacks",
+        "recognizer_calls": "entity_recognizer_model_calls",
+        "recognizer_failures": "entity_recognizer_model_failures",
+        "recognizer_fallbacks": "entity_recognizer_fallbacks",
+        "auditor_calls": "recovery_auditor_calls",
+        "auditor_failures": "recovery_auditor_failures",
     }
+    counters = {key: 0 for key in metric_keys}
     local_tokens = 0.0
     local_latencies = []
     for row in rows:
         metrics = row.get("privacy_agent_metrics") or {}
-        for key in counters:
-            counters[key] += int(metrics.get(key, 0))
+        for key, metric_key in metric_keys.items():
+            counters[key] += int(metrics.get(metric_key, 0))
         usage = row.get("privacy_model_usage") or {}
         local_tokens += float(usage.get("prompt_tokens", 0))
         local_tokens += float(usage.get("completion_tokens", 0))
@@ -211,6 +216,8 @@ def main() -> None:
                     server_name,
                     "--max-output-tokens",
                     "256",
+                    "--format-guard",
+                    "--json-grammar",
                     "--port",
                     str(args.privacy_port),
                 ],

@@ -30,7 +30,7 @@
 模型角色必须分开：
 
 - 三套模型作为金融 Agent 的决策基座，负责新闻/行情理解、研究、风险判断和目标权重/交易 action；
-- 本地隐私模型负责残余 span、P1-P5 描述和恢复语义审计。先在 NLPCC 固定 Qwen3.8-27B 任务模型，按 `benchmarks/local_privacy_models.json` 比较 10 个不超过 4B 的 instruction-tuned 模型：Qwen3.5-0.8B/2B/4B、Qwen3-0.6B/1.7B、Llama-3.2-1B/3B-Instruct、Gemma-3-1B/4B-it 和 Gemma-4-4B-it。Qwen3.8-27B 只能作为任务模型或上界参考，不能作为最终本地隐私 Agent。它不能创建 alias、不能修改映射、不能绕过安全主表校验；严格实验禁止整套 deterministic fallback 冒充模型成功。
+- 本地隐私模型负责残余 span、P1-P5 描述和恢复语义审计。当前正式协议固定使用 `Qwen/Qwen2.5-3B-Instruct`（本地路径由 `benchmarks/local_privacy_qwen3b.json` 指定），Qwen3.8-27B 只能作为任务模型。Qwen2.5-3B-Instruct 不能创建 alias、不能修改映射、不能绕过安全主表校验；模型输出不完整时只允许从本地 security master 生成安全兜底，并单独计入 fallback，不能冒充模型成功。旧的十模型选型和 Llama 结果仅作历史记录，不得进入正式主表。
 
 先审计 GPU 后再决定 tensor parallel 和 max context，不要在没有预算和磁盘确认时下载权重。复制 `.env.example` 后只在密钥管理器或本地 `.env` 中填值，且确认 `.env` 被 Git 忽略。
 

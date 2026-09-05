@@ -4,17 +4,25 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 import hashlib
 import hmac
 import json
+import os
 from pathlib import Path
 import re
 import threading
 import time
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
-from finscope import LocalPrivacyAgent
+from finscope import (
+    AdaptiveReplacementController,
+    AdaptiveRuntime,
+    LocalPrivacyAgent,
+    RiskEstimator,
+    TaskDependencyState,
+    load_risk_estimator,
+)
 from benchmarks.local_privacy_agent import (
     LocalPrivacyModelConfig,
     build_model_assisted_agent,
@@ -421,7 +429,9 @@ class ProxyConfig:
     seed: str
     timeout: float
     privacy_model_base_url: str = ""
-    privacy_model_name: str = "Qwen3.5-2B"
+    privacy_model_name: str = "Qwen2.5-3B-Instruct"
+    adaptive_threshold: float = 0.60
+    adaptive_calibration: str = ""
 
 
 class PrivacyController:
@@ -433,6 +443,10 @@ class PrivacyController:
         self.episode_mappers: Dict[str, AliasMapper] = {}
         self.agents: Dict[str, LocalPrivacyAgent] = {}
         self.scopes: Dict[str, Any] = {}
+        self.adaptive_controllers: Dict[str, AdaptiveReplacementController] = {}
+        self.adaptive_runtimes: Dict[str, AdaptiveRuntime] = {}
+        self.adaptive_context: Dict[str, Dict[str, Any]] = {}
+        self.first_days: Dict[str, date] = {}
         self.lock = threading.RLock()
         self.audit_lock = threading.Lock()
         self.request_count = 0
@@ -449,9 +463,24 @@ class PrivacyController:
             if config.method == "finscope" and config.privacy_model_base_url
             else None
         )
+        self.risk_estimator = self._load_risk_estimator(config.adaptive_calibration)
         config.audit_log.parent.mkdir(parents=True, exist_ok=True)
 
+    @staticmethod
+    def _load_risk_estimator(path: str) -> RiskEstimator:
+        if not path:
+            return RiskEstimator()
+        source = Path(path)
+        if not source.is_file():
+            raise FileNotFoundError("adaptive calibration artifact not found: %s" % source)
+        return load_risk_estimator(source)
+
     def episode_id(self, payload: Mapping[str, Any]) -> str:
+        # FinScope keeps one task/session state across dates. Baselines retain
+        # their day-scoped identifiers for an apples-to-apples comparison.
+        task = payload.get("finscope_task")
+        if self.config.method == "finscope" and isinstance(task, str) and task.strip():
+            return task.strip()
         explicit = payload.get("finscope_episode")
         if isinstance(explicit, str) and explicit.strip():
             return explicit.strip()
@@ -473,6 +502,60 @@ class PrivacyController:
         source = first_user or "\n".join(texts)
         return "case-" + hashlib.sha256(source.encode("utf-8")).hexdigest()[:16]
 
+    def trading_day(self, payload: Mapping[str, Any], episode: str) -> str:
+        explicit = payload.get("finscope_episode")
+        if isinstance(explicit, str) and DATE_PATTERN.fullmatch(explicit.strip()):
+            return explicit.strip().replace("/", "-")
+        texts = list(_walk_strings(payload.get("messages", [])))
+        dates = [
+            "%04d-%02d-%02d" % tuple(int(part) for part in match.groups())
+            for text in texts
+            for match in DATE_PATTERN.finditer(text)
+        ]
+        return max(dates) if dates else (episode if DATE_PATTERN.fullmatch(episode) else "2026-08-22")
+
+    @staticmethod
+    def task_phase(role: str, payload: Mapping[str, Any]) -> str:
+        text = "\n".join(_walk_strings(payload.get("messages", []))).casefold()
+        # StockBench supplies stable logical roles. Their system prompts
+        # mention buy/sell even during research, so role takes precedence over
+        # keyword matching to avoid forcing every request to P5.
+        if role in {"fundamental_filter", "research_agent"}:
+            return "analysis"
+        if role in {"decision_agent", "portfolio_strategist"}:
+            return "risk"
+        if any(token in text for token in ("execute", "execution", "place order", "buy", "sell", "trade", "order")):
+            return "execution"
+        if "<decision>" in text:
+            return "risk"
+        return "tool"
+
+    @staticmethod
+    def field_risk(phase: str, payload: Mapping[str, Any]) -> int:
+        text = "\n".join(_walk_strings(payload.get("messages", []))).casefold()
+        if phase == "execution":
+            return 5
+        # Research prompts carry position snapshots as context, but do not
+        # expose an executable order. Treating those fields as execution risk
+        # would collapse every research call to P5.
+        if phase == "analysis":
+            return 2
+        if any(token in text for token in ("quantity", "shares", "weight", "position", "holding")):
+            return 4
+        if any(token in text for token in ("price", "return", "risk", "drawdown", "order")):
+            return 3
+        return 2 if any(token in text for token in ("market", "news", "fundamental")) else 1
+
+    @staticmethod
+    def dependencies(role: str, phase: str) -> TaskDependencyState:
+        if phase == "analysis" or role == "fundamental_filter":
+            return TaskDependencyState(pending_conclusion=True)
+        if phase == "risk" or role in {"decision_agent", "portfolio_strategist"}:
+            return TaskDependencyState(pending_risk_judgement=True)
+        if phase == "execution":
+            return TaskDependencyState(pending_action=True)
+        return TaskDependencyState()
+
     def role(self, payload: Mapping[str, Any]) -> str:
         explicit = payload.get("finscope_role")
         if isinstance(explicit, str) and explicit.strip():
@@ -492,7 +575,7 @@ class PrivacyController:
                 )
             return self.episode_mappers[episode]
 
-    def _finscope(self, episode: str) -> Tuple[LocalPrivacyAgent, Any]:
+    def _finscope(self, episode: str, trading_day: str = "") -> Tuple[LocalPrivacyAgent, Any]:
         with self.lock:
             if episode not in self.agents:
                 agent = (
@@ -505,11 +588,19 @@ class PrivacyController:
                 )
                 scope = agent.open_scope(
                     f"{self.config.benchmark}:{episode}",
-                    episode if DATE_PATTERN.fullmatch(episode) else "2026-08-22",
+                    trading_day or (episode if DATE_PATTERN.fullmatch(episode) else "2026-08-22"),
                     conversation_id=episode,
                 )
                 self.agents[episode] = agent
                 self.scopes[episode] = scope
+                controller = AdaptiveReplacementController(
+                    self.risk_estimator,
+                    threshold=self.config.adaptive_threshold,
+                    default_level=self.config.disclosure_level,
+                )
+                controller.bind_scope(scope.id)
+                self.adaptive_controllers[episode] = controller
+                self.adaptive_runtimes[episode] = AdaptiveRuntime(agent, controller)
             return self.agents[episode], self.scopes[episode]
 
     def transform(self, payload: Dict[str, Any], episode: str) -> Tuple[Dict[str, Any], Any]:
@@ -518,6 +609,7 @@ class PrivacyController:
         # the OpenAI request schema accepted by the upstream model service.
         outbound.pop("finscope_episode", None)
         outbound.pop("finscope_role", None)
+        outbound.pop("finscope_task", None)
         outbound["model"] = self.config.upstream_model
         messages = outbound.get("messages", [])
         method = self.config.method
@@ -538,15 +630,128 @@ class PrivacyController:
             outbound["messages"] = mapper.sanitize(messages)
             return outbound, mapper
         if method == "finscope":
-            agent, scope = self._finscope(episode)
+            trading_day = self.trading_day(payload, episode)
+            agent, scope = self._finscope(episode, trading_day)
+            controller = self.adaptive_controllers[episode]
+            previous_context = self.adaptive_context.get(episode, {})
+            day_boundary = bool(
+                previous_context.get("trading_day")
+                and previous_context.get("trading_day") != trading_day
+            )
+            role = self.role(payload)
+            phase = self.task_phase(role, payload)
+            field_risk = self.field_risk(phase, payload)
+            purpose = "execution" if phase == "execution" else ("risk" if phase == "risk" else "research")
+            controller.bind_scope(scope.id)
+            level = controller.choose_level(
+                purpose=purpose,
+                task_phase=phase,
+                field_risk=field_risk,
+            )
             outbound["messages"] = agent.sanitize(
                 messages,
                 scope,
-                disclosure_level=self.config.disclosure_level,
-                purpose="financial-agent-task",
+                disclosure_level=level,
+                purpose=purpose,
             )
+            day = date.fromisoformat(trading_day)
+            first_day = self.first_days.setdefault(episode, day)
+            aliases = tuple(
+                alias.upper()
+                for alias in re.findall(r"FS_(?:ASSET|ORG|PORTFOLIO|STRATEGY|ACCOUNT|REF|ACTION|REL|INTENT)_[A-Z0-9]+", json.dumps(outbound.get("messages", "")))
+            )
+            bindings = agent.get_bindings(scope)
+            by_alias = {item.alias: item for item in bindings}
+            self.adaptive_context[episode] = {
+                "trading_day": trading_day,
+                "elapsed_days": max(0, (day - first_day).days),
+                "role": role,
+                "phase": phase,
+                "purpose": purpose,
+                "field_risk": field_risk,
+                "level": level.name,
+                "alias_occurrences": len(aliases),
+                "assets": [by_alias[item].canonical_id for item in aliases if item in by_alias],
+                "scope_id": scope.id,
+                # A trading-day boundary is a local safe checkpoint. The
+                # current request finishes under the old scope; rotation is
+                # applied after its response, before the next request.
+                "day_boundary": day_boundary,
+            }
             return outbound, (agent, scope)
         raise AssertionError("unreachable")
+
+    def observe_adaptive(
+        self,
+        episode: str,
+        *,
+        output: Mapping[str, Any],
+        restoration_status: str,
+    ) -> Dict[str, Any]:
+        """Update local exposure after a call and rotate only at a safe point."""
+
+        if self.config.method != "finscope":
+            return {}
+        with self.lock:
+            context = dict(self.adaptive_context.get(episode, {}))
+            controller = self.adaptive_controllers.get(episode)
+            runtime = self.adaptive_runtimes.get(episode)
+            scope = self.scopes.get(episode)
+            if controller is None or runtime is None or scope is None:
+                return {}
+            phase = str(context.get("phase", "analysis"))
+            decision = controller.observe_call(
+                alias_occurrences=int(context.get("alias_occurrences", 0)),
+                elapsed_days=int(context.get("elapsed_days", 0)),
+                visible_roles=(str(context.get("role", "")),),
+                market_events=1,
+                trade_events=1 if phase == "execution" else 0,
+                assets=context.get("assets", ()),
+                high_risk_events=1 if int(context.get("field_risk", 1)) >= 4 else 0,
+                dependencies=self.dependencies(str(context.get("role", "")), phase),
+                safe_checkpoint=phase in {"tool", "execution"}
+                or bool(context.get("day_boundary")),
+                task_phase=phase,
+                field_risk=int(context.get("field_risk", 1)),
+                purpose=str(context.get("purpose", "research")),
+            )
+            rotation = None
+            if decision.decision.value != "keep":
+                minimal_state = {
+                    "task_phase": phase,
+                    "trading_day": context.get("trading_day", ""),
+                    "restoration_status": restoration_status,
+                    "last_output_fingerprint": hashlib.sha256(
+                        json.dumps(output, ensure_ascii=False, sort_keys=True).encode("utf-8")
+                    ).hexdigest(),
+                }
+                old_scope = scope
+                new_scope, reset = runtime.rotate_at_checkpoint(
+                    old_scope,
+                    minimal_state,
+                    trading_day=str(context.get("trading_day", "")) or None,
+                )
+                self.scopes[episode] = new_scope
+                rotation = {
+                    "old_scope_id": reset.old_scope_id,
+                    "new_scope_id": reset.new_scope_id,
+                    "reason": decision.reason,
+                }
+            return {
+                "level": decision.level.name,
+                "requested_level": str(context.get("level", decision.level.name)),
+                "risk": {
+                    "reid_at_1": decision.risk.reid_at_1,
+                    "link_auc": decision.risk.link_auc,
+                    "combined": decision.risk.combined,
+                },
+                "threshold_T": controller.threshold,
+                "decision": decision.decision.value,
+                "reason": decision.reason,
+                "exposure_state": controller.exposure.as_dict(),
+                "rotation": rotation,
+                "estimator_fitted": controller.estimator.fitted,
+            }
 
     def restore(
         self, response: Dict[str, Any], state: Any
@@ -787,15 +992,24 @@ def create_app(config: ProxyConfig, entries: Sequence[CatalogEntry]):
             else {}
         )
         privacy_agent_metrics = {}
+        adaptive_metrics = {}
+        bindings_snapshot: List[Dict[str, str]] = []
         if config.method == "finscope" and state is not None:
             agent, scope = state
             privacy_agent_metrics = agent.get_metrics(scope)
+            bindings_snapshot = controller.bindings(episode, state)
+            adaptive_metrics = controller.observe_adaptive(
+                episode,
+                output=restored,
+                restoration_status=restoration_status,
+            )
         controller.audit(
             {
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "benchmark": config.benchmark,
                 "method": config.method,
                 "episode_id": episode,
+                "trading_day": controller.trading_day(payload, episode),
                 "role": role,
                 "status": "ok",
                 "input_fingerprint": input_fingerprint,
@@ -809,11 +1023,12 @@ def create_app(config: ProxyConfig, entries: Sequence[CatalogEntry]):
                 "total_latency_ms": total_latency_ms,
                 "privacy_model_usage": privacy_model_usage,
                 "privacy_agent_metrics": privacy_agent_metrics,
+                "adaptive": adaptive_metrics,
                 "restoration_status": restoration_status,
                 "restoration_issues": restoration_issues,
                 "exact_restore": exact_restore if state is not None else None,
                 "unsafe_repair": False,
-                "bindings": controller.bindings(episode, state),
+                "bindings": bindings_snapshot,
             }
         )
         return restored
@@ -829,7 +1044,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--upstream-url", required=True)
     parser.add_argument("--upstream-model", default="Qwen3.8-27B")
     parser.add_argument("--privacy-model-base-url", default="")
-    parser.add_argument("--privacy-model-name", default="Qwen3.5-2B")
+    parser.add_argument("--privacy-model-name", default="Qwen2.5-3B-Instruct")
+    parser.add_argument(
+        "--adaptive-threshold",
+        type=float,
+        default=float(os.environ.get("FINSCOPE_ADAPTIVE_T", "0.60")),
+        help="risk threshold T used by FinScope Adaptive",
+    )
+    parser.add_argument(
+        "--adaptive-calibration",
+        default=os.environ.get("FINSCOPE_ADAPTIVE_CALIBRATION", ""),
+        help="JSON prior-attack artifact used to fit the online risk estimator",
+    )
     parser.add_argument("--audit-log", type=Path, required=True)
     parser.add_argument("--disclosure-level", choices=("P1", "P2", "P3", "P4", "P5"), default="P3")
     parser.add_argument("--seed", default="finscope-external-benchmark-v1")
@@ -860,6 +1086,8 @@ def main() -> None:
         timeout=args.timeout,
         privacy_model_base_url=args.privacy_model_base_url,
         privacy_model_name=args.privacy_model_name,
+        adaptive_threshold=args.adaptive_threshold,
+        adaptive_calibration=args.adaptive_calibration,
     )
     uvicorn.run(create_app(config, entries), host=args.host, port=args.port, log_level="info")
 

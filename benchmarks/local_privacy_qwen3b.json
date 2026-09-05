@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "model_id": "Qwen/Qwen2.5-3B-Instruct",
+  "model_name": "Qwen2.5-3B-Instruct",
+  "parameters_b": 3.0,
+  "model_path": "/home/zgx/models/Qwen2.5-3B-Instruct",
+  "roles": [
+    "residual_entity_recognition",
+    "disclosure_planning",
+    "recovery_audit"
+  ],
+  "protocol": {
+    "task_model": "Qwen3.8-27B",
+    "disclosure_level": "P3",
+    "fallback_allowed": true,
+    "selection": "fixed by study protocol",
+    "adaptive_disclosure": true,
+    "adaptive_threshold_source": "development-only public-prior attack plus utility constraint"
+  }
+}

@@ -261,15 +261,23 @@ class JsonModelDisclosurePlanner:
                 return self._cache[cache_key]
             fallback = self.fallback.plan(profile, purpose)
             prompt = self._prompt(profile, purpose)
-            # Strict runs may retry transiently truncated or malformed JSON,
-            # but never substitute the deterministic plan as a successful
-            # model result. Three attempts bounds both latency and cost.
+            # Strict runs retry transiently truncated or malformed JSON. The
+            # retry prompt is deliberately different: repeating a temperature
+            # zero prompt can reproduce the same invalid plan forever. We
+            # still accept only a plan whose fields pass the security-master
+            # validator; a deterministic fallback is never counted as a
+            # successful model result.
             attempts = 3 if not self.allow_fallback else 1
             last_error: Optional[Exception] = None
-            for _ in range(attempts):
+            for attempt in range(attempts):
                 self.calls += 1
                 try:
-                    payload = self._parse_json(self.model_call(prompt))
+                    request = (
+                        prompt
+                        if attempt == 0
+                        else self._repair_prompt(profile, purpose, last_error)
+                    )
+                    payload = self._parse_json(self.model_call(request))
                     proposed = self._validate(payload, profile, fallback)
                     if proposed is fallback:
                         last_error = ValueError(
@@ -297,6 +305,26 @@ class JsonModelDisclosurePlanner:
             self.fallbacks += 1
             self._cache[cache_key] = fallback
             return fallback
+
+    def _repair_prompt(
+        self,
+        profile: AssetProfile,
+        purpose: str,
+        previous_error: Optional[Exception],
+    ) -> str:
+        """Ask the local model to correct a rejected plan without new facts."""
+
+        base = self._prompt(profile, purpose)
+        reason = str(previous_error or "previous JSON failed validation")[:160]
+        return (
+            base
+            + "\n上一次输出未通过本地校验（%s）。请重新生成，严格遵守："
+            "candidates必须恰好包含P1、P2、P3、P4、P5各一项；"
+            "descriptor只能是SECURITY_MASTER中所列字段值按顺序直接拼接，"
+            "used_attributes必须与实际拼接字段完全一致；不要输出空列表、"
+            "额外字段、真实证券名/代码、句柄、Markdown或解释。"
+            % reason
+        )
 
     def _prompt(self, profile: AssetProfile, purpose: str) -> str:
         safe_profile = profile.attributes()
@@ -354,7 +382,16 @@ class JsonModelDisclosurePlanner:
             return fallback
         by_level: Dict[DisclosureLevel, DisclosureCandidate] = {}
         attributes = profile.attributes()
-        forbidden = tuple(item.casefold() for item in profile.identifiers() if item)
+        # A model recognizer can surface a one-character generic category
+        # (for example ``股``) as an entity. Treating that character as a
+        # substring would reject the safe master value ``股票`` at every
+        # disclosure level. Real security identifiers and names are longer
+        # and remain checked exactly as before.
+        forbidden = tuple(
+            item.casefold()
+            for item in profile.identifiers()
+            if item and len(item.strip()) > 1
+        )
         for row in rows:
             if not isinstance(row, Mapping):
                 continue

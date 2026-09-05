@@ -296,26 +296,18 @@
 
 这一组回答“本地隐私 Agent 是否可行、FinScope 的组件是否必要、恢复错误是否会被交易前安全边界拦截”。表 8 是模型选择，表 9 才是严格意义上的组件消融，表 10 是故障注入实验。
 
-### 表 8：本地隐私 Agent 模型选择
+### 表 8：正式本地隐私 Agent
 
-**说明：** 本表在固定 NLPCC 20 日开发集上比较 10 个不超过 4B 的本地模型，作用是证明隐私 Agent 可以由小模型可靠承担并锁定后续正式实验模型，服务 Idea 1。
+**说明：** 按当前实验方案，正式本地隐私 Agent 固定使用 Qwen2.5-3B-Instruct；旧的多模型选型仅作历史支撑，Llama 结果不进入新主表，服务 Idea 1。
 
 | Local Model | Size | Strict Planner Valid ↑ | Recognizer Fail ↓ | Auditor Fail ↓ | Whole-chain Fallback ↓ | Planner Repair ↓ | Local Tokens ↓ | Local p95 ↓ | Status |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| Qwen3.5-0.8B | 0.8B | - | - | - | - | - | - | - | 未形成合格完整结果 |
-| Qwen3.5-2B | 2B | - | - | - | - | - | - | - | 未形成合格完整结果 |
-| Qwen3.5-4B | 4B | - | - | - | - | - | - | - | 未形成合格完整结果 |
-| Qwen3-0.6B | 0.6B | - | - | - | - | - | - | - | 未形成合格完整结果 |
-| Qwen3-1.7B | 1.7B | - | - | - | - | - | - | - | 未形成合格完整结果 |
-| Llama-3.2-1B-Instruct | 1B | - | - | - | - | - | - | - | 未形成合格完整结果 |
-| Llama-3.2-3B-Instruct | 3B | 100% | 0 | 0 | 0 | - | - | 48.70s | 已选定 |
-| Gemma-3-1B-it | 1B | - | - | - | - | - | - | - | 未形成合格完整结果 |
-| Gemma-3-4B-it | 4B | - | - | - | - | - | - | - | 未形成合格完整结果 |
-| Gemma-4-4B-it | 4B | - | - | - | - | - | - | - | 当前配置不可用 |
+| Qwen2.5-3B-Instruct | 3B | 100%（2日 smoke） | 0（smoke） | 0（smoke） | 0 | - | - | - | 正式模型，待完成开发集 |
+| Llama-3.2-3B-Instruct（历史） | 3B | 100% | 0 | 0 | 0 | - | - | 48.70s | 不进入正式结果 |
 
 #### 表 8 指标来源与实现
 
-- **Local Model、Size、Status**：模型元数据和运行可用性，不是效果指标；参数量来自模型配置，Status 记录是否有权重、是否完成严格开发集测试以及是否被选中。
+- **Local Model、Size、Status**：模型元数据和运行可用性，不是效果指标；参数量来自模型配置，Status 记录是否完成当前协议测试。历史 Llama 行只用于追溯，不能覆盖 Qwen2.5-3B-Instruct 的正式结果。
 - **Strict Planner Valid**：本文定义的本地 Agent 协议指标。在禁止整链 deterministic fallback 的条件下，规划器输出必须是完整 JSON、等级只能是 P1-P5、字段必须属于该等级允许集合并通过本地校验，成功次数除以规划调用次数；统计实现位于 `benchmarks/run_nlpcc_local_model_ablation.py`。
 - **Recognizer Fail、Auditor Fail**：本文定义的角色级失败率，分别统计识别器无法返回合法实体结果、恢复审计器无法返回合法审计结果的调用比例。
 - **Whole-chain Fallback**：由运行计数器统计整条本地 Agent 链路退回确定性规则的次数；它与允许的字段级安全修正分开，不把 fallback 伪装成模型成功。

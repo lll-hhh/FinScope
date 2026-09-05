@@ -43,6 +43,40 @@ class ExternalPrivacyProxyTests(unittest.TestCase):
             )
             self.assertEqual(episode, "2025-03-03")
 
+    def test_finscope_task_id_is_stable_across_trading_days(self):
+        with tempfile.TemporaryDirectory() as directory:
+            controller = PrivacyController(
+                config("finscope", Path(directory) / "audit.jsonl"),
+                stockbench_catalog(),
+            )
+            base = {
+                "finscope_task": "backtest-001",
+                "finscope_episode": "2025-03-03",
+                "messages": [{"role": "user", "content": "Analyze AAPL"}],
+            }
+            self.assertEqual(controller.episode_id(base), "backtest-001")
+            self.assertEqual(
+                controller.episode_id({**base, "finscope_episode": "2025-03-04"}),
+                "backtest-001",
+            )
+
+    def test_trading_day_boundary_is_a_safe_rotation_checkpoint(self):
+        with tempfile.TemporaryDirectory() as directory:
+            controller = PrivacyController(
+                config("finscope", Path(directory) / "audit.jsonl"),
+                stockbench_catalog(),
+            )
+            first = {
+                "finscope_task": "backtest-002",
+                "finscope_episode": "2025-03-03",
+                "finscope_role": "fundamental_filter",
+                "messages": [{"role": "user", "content": "Analyze AAPL"}],
+            }
+            next_day = {**first, "finscope_episode": "2025-03-04"}
+            controller.transform(first, "backtest-002")
+            controller.transform(next_day, "backtest-002")
+            self.assertTrue(controller.adaptive_context["backtest-002"]["day_boundary"])
+
     def test_episode_alias_rotates_and_restores(self):
         catalog = IdentityCatalog(stockbench_catalog())
         first = AliasMapper(catalog, "EA", b"secret", "2025-03-03")

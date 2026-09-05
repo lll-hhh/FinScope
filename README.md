@@ -138,7 +138,8 @@ COLING B1 当前执行版的八项补充实验（动态披露、长程替换与�
 | 名称 | 部署 | 配置用途 |
 | --- | --- | --- |
 | Qwen3.8-27B | 本地 vLLM/SGLang/OpenAI-compatible 服务 | 金融任务基座；不作为最终本地隐私 Agent |
-| 10 个 ≤4B instruction-tuned 小模型 | 本地 Transformers/OpenAI-compatible 服务 | NLPCC 固定开发集上的本地隐私 Agent 消融；清单见 `benchmarks/local_privacy_models.json` |
+| Qwen2.5-3B-Instruct | 本地 Transformers/OpenAI-compatible 服务 | 当前正式本地隐私 Agent，固定承担识别、P-level 规划和恢复审计；配置见 `benchmarks/local_privacy_qwen3b.json` |
+| 10 个 ≤4B instruction-tuned 小模型 | 本地 Transformers/OpenAI-compatible 服务 | 可选的历史模型选择支撑，不得替换正式 Qwen2.5-3B-Instruct |
 | DeepSeek V4 Flash | 企业 OpenAI-compatible 网关 | 外部基座对照 |
 | GLM-5.1 | 企业 OpenAI-compatible 网关 | 外部基座对照 |
 

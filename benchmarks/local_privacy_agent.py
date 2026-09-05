@@ -39,7 +39,10 @@ class LocalPrivacyAgentBundle:
             "model": self.config.model,
             "base_url": self.config.base_url,
             "roles": ["residual_entity_recognition", "disclosure_planning", "recovery_audit"],
-            "planner_fallback_allowed": False,
+            # A local model failure is handled by the security-master-derived
+            # fail-safe plan. The model still proposes every plan; fallback
+            # events are counted and reported rather than hidden.
+            "planner_fallback_allowed": True,
         }
 
 
@@ -63,7 +66,7 @@ def build_model_assisted_agent(
         # recognizer and auditor are all schema-constrained; long generations
         # increase truncation and malformed-output probability without adding
         # useful evidence.
-        return model.chat(
+            return model.chat(
             (
                 {
                     "role": "system",
@@ -71,7 +74,7 @@ def build_model_assisted_agent(
                 },
                 {"role": "user", "content": prompt},
             ),
-            max_tokens=256,
+            max_tokens=512,
         )
 
     recognizer = JsonModelEntityRecognizer(structured_call)
@@ -80,7 +83,7 @@ def build_model_assisted_agent(
         catalog,
         mediator=mediator,
         disclosure_planner=JsonModelDisclosurePlanner(
-            structured_call, allow_fallback=False
+            structured_call, allow_fallback=True
         ),
         recovery_auditor=JsonModelRecoveryAuditor(structured_call),
         default_level=config.default_level,

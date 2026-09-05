@@ -5,11 +5,13 @@ FINSCOPE_ROOT=${FINSCOPE_ROOT:-/home/zgx/repos/FinScope-git}
 STOCKBENCH_ROOT=${STOCKBENCH_ROOT:-/home/zgx/repos/stockbench-src}
 FINVAULT_ROOT=${FINVAULT_ROOT:-/home/zgx/repos/FinVault-src}
 PYTHON=${PYTHON:-/home/zgx/venvs/finscope-qwen38/bin/python}
-PRIVACY_TAG=${PRIVACY_TAG:-qwen35_2b}
+PRIVACY_TAG=${PRIVACY_TAG:-qwen25_3b}
 RUN_ROOT=${RUN_ROOT:-/home/zgx/runlogs/finscope_qwen_20260822/${PRIVACY_TAG}_local_agent_final}
 MODEL_NAME=${MODEL_NAME:-Qwen3.8-27B}
 PRIVACY_MODEL_BASE_URL=${PRIVACY_MODEL_BASE_URL:-http://127.0.0.1:8112/v1}
-PRIVACY_MODEL_NAME=${PRIVACY_MODEL_NAME:-Qwen3.5-2B}
+PRIVACY_MODEL_NAME=${PRIVACY_MODEL_NAME:-Qwen2.5-3B-Instruct}
+ADAPTIVE_THRESHOLD=${ADAPTIVE_THRESHOLD:-${FINSCOPE_ADAPTIVE_T:-0.60}}
+ADAPTIVE_CALIBRATION=${ADAPTIVE_CALIBRATION:-${FINSCOPE_ADAPTIVE_CALIBRATION:-}}
 
 mkdir -p "$RUN_ROOT" "$FINSCOPE_ROOT/benchmarks/results"
 
@@ -49,6 +51,8 @@ run_stockbench() {
     --upstream-model "$MODEL_NAME" --audit-log "$audit" \
     --privacy-model-base-url "$PRIVACY_MODEL_BASE_URL" \
     --privacy-model-name "$PRIVACY_MODEL_NAME" \
+    --adaptive-threshold "$ADAPTIVE_THRESHOLD" \
+    ${ADAPTIVE_CALIBRATION:+--adaptive-calibration "$ADAPTIVE_CALIBRATION"} \
     --port "$proxy_port" >"$proxy_log" 2>&1 &
   local proxy_pid=$!
   trap 'kill -TERM "$proxy_pid" 2>/dev/null || true' RETURN
@@ -83,6 +87,8 @@ run_finvault() {
     --upstream-model "$MODEL_NAME" --audit-log "$audit" \
     --privacy-model-base-url "$PRIVACY_MODEL_BASE_URL" \
     --privacy-model-name "$PRIVACY_MODEL_NAME" \
+    --adaptive-threshold "$ADAPTIVE_THRESHOLD" \
+    ${ADAPTIVE_CALIBRATION:+--adaptive-calibration "$ADAPTIVE_CALIBRATION"} \
     --port "$proxy_port" >"$proxy_log" 2>&1 &
   local proxy_pid=$!
   trap 'kill -TERM "$proxy_pid" 2>/dev/null || true' RETURN

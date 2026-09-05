@@ -1,0 +1,672 @@
+{
+  "schema_version": 1,
+  "rows": [
+    {
+      "benchmark": "stockbench",
+      "model": "Qwen3.8-27B",
+      "method": "vanilla",
+      "complete": true,
+      "native": {
+        "total_return": 0.04236628306854984,
+        "sortino_annual": 2.2530786917754697,
+        "max_drawdown": 0.024284802077380485,
+        "sharpe": 1.678741516330512,
+        "artifact": "/home/zgx/repos/stockbench-src/storage/reports/backtest/qwen38_vanilla_full_20250301_20250731_20260822_135709_701444/metrics.json"
+      },
+      "privacy": {
+        "attacker": "catalog_side_information_oracle_random_tie_break",
+        "candidate_count": 20,
+        "observable_groups": 20,
+        "reid_at_1": 1.0,
+        "link_auc": 1.0,
+        "identity_scope": "benchmark-local public identifiers"
+      },
+      "audit": {
+        "requests": 211,
+        "successful_requests": 211,
+        "request_success_rate": 1.0,
+        "task_tokens": 4461030,
+        "rewrite_tokens": 0,
+        "total_tokens": 4461030,
+        "e2e_p95_ms": 253267.0,
+        "exact_restore_rate": null,
+        "unsafe_repair_rate": 0.0,
+        "source": "StockBench enhanced LLM cache"
+      },
+      "token_delta_vs_vanilla": 0.0,
+      "decision_preservation": null,
+      "reference_continuity": {
+        "stable": 0,
+        "comparable_assets": 0,
+        "asset_rate": null,
+        "stable_episodes": 0,
+        "episodes": 0,
+        "episode_rate": null
+      }
+    },
+    {
+      "benchmark": "stockbench",
+      "model": "Qwen3.8-27B",
+      "method": "deletion",
+      "complete": true,
+      "native": {
+        "total_return": 0.0,
+        "sortino_annual": 0.0,
+        "max_drawdown": 0.0,
+        "sharpe": 0.0,
+        "artifact": "/home/zgx/repos/stockbench-src/storage/reports/backtest/qwen38_deletion_qwen35_2b_v6_privacy_full_20250303_20250731_final_20260823_214214_675507/metrics.json"
+      },
+      "privacy": {
+        "attacker": "catalog_side_information_oracle_random_tie_break",
+        "candidate_count": 20,
+        "observable_groups": 1,
+        "reid_at_1": 0.05,
+        "link_auc": 0.5,
+        "identity_scope": "benchmark-local public identifiers"
+      },
+      "audit": {
+        "requests": 211,
+        "successful_requests": 211,
+        "request_success_rate": 1.0,
+        "input_sensitive_mentions": 41462,
+        "outbound_sensitive_mentions": 0,
+        "rewrite_outbound_sensitive_mentions": 0,
+        "all_external_sensitive_mentions": 0,
+        "upstream_sensitive_mentions": 9,
+        "task_tokens": 4058073,
+        "rewrite_tokens": 0,
+        "total_tokens": 4058073,
+        "e2e_p95_ms": 138160.34670127556,
+        "exact_restore_rate": null,
+        "exact_action_restore_rate": null,
+        "unsafe_repair_rate": 0.0,
+        "restoration_status": {},
+        "restoration_issue_codes": {}
+      },
+      "token_delta_vs_vanilla": -0.09032824258074934,
+      "decision_preservation": null,
+      "reference_continuity": {
+        "stable": 0,
+        "comparable_assets": 0,
+        "asset_rate": null,
+        "stable_episodes": 0,
+        "episodes": 0,
+        "episode_rate": null
+      }
+    },
+    {
+      "benchmark": "stockbench",
+      "model": "Qwen3.8-27B",
+      "method": "llm_rewrite",
+      "complete": true,
+      "native": {
+        "total_return": 0.0,
+        "sortino_annual": 0.0,
+        "max_drawdown": 0.0,
+        "sharpe": 0.0,
+        "artifact": "/home/zgx/repos/stockbench-src/storage/reports/backtest/qwen38_llm_rewrite_qwen35_2b_v6_privacy_full_20250303_20250731_final_20260823_212809_335149/metrics.json"
+      },
+      "privacy": {
+        "attacker": "catalog_side_information_oracle_random_tie_break",
+        "candidate_count": 20,
+        "observable_groups": 20,
+        "reid_at_1": 1.0,
+        "link_auc": 1.0,
+        "identity_scope": "benchmark-local public identifiers"
+      },
+      "audit": {
+        "requests": 211,
+        "successful_requests": 211,
+        "request_success_rate": 1.0,
+        "input_sensitive_mentions": 41462,
+        "outbound_sensitive_mentions": 0,
+        "rewrite_outbound_sensitive_mentions": 41042,
+        "all_external_sensitive_mentions": 41042,
+        "upstream_sensitive_mentions": 5,
+        "task_tokens": 652961,
+        "rewrite_tokens": 3475120,
+        "total_tokens": 4128081,
+        "e2e_p95_ms": 103934.15404995903,
+        "exact_restore_rate": null,
+        "exact_action_restore_rate": null,
+        "unsafe_repair_rate": 0.0,
+        "restoration_status": {},
+        "restoration_issue_codes": {}
+      },
+      "token_delta_vs_vanilla": -0.0746350058170423,
+      "decision_preservation": null,
+      "reference_continuity": {
+        "stable": 0,
+        "comparable_assets": 0,
+        "asset_rate": null,
+        "stable_episodes": 0,
+        "episodes": 0,
+        "episode_rate": null
+      }
+    },
+    {
+      "benchmark": "stockbench",
+      "model": "Qwen3.8-27B",
+      "method": "global_alias",
+      "complete": true,
+      "native": {
+        "total_return": -0.01745456981013005,
+        "sortino_annual": -0.11077950614991074,
+        "max_drawdown": 0.12173766601174907,
+        "sharpe": -0.09605815607976805,
+        "artifact": "/home/zgx/repos/stockbench-src/storage/reports/backtest/qwen38_global_alias_qwen35_2b_v6_privacy_full_20250303_20250731_final_20260823_221500_059693/metrics.json"
+      },
+      "privacy": {
+        "attacker": "catalog_side_information_oracle_random_tie_break",
+        "candidate_count": 20,
+        "observable_groups": 1,
+        "reid_at_1": 0.05,
+        "link_auc": 1.0,
+        "identity_scope": "benchmark-local public identifiers"
+      },
+      "audit": {
+        "requests": 211,
+        "successful_requests": 211,
+        "request_success_rate": 1.0,
+        "input_sensitive_mentions": 41464,
+        "outbound_sensitive_mentions": 0,
+        "rewrite_outbound_sensitive_mentions": 0,
+        "all_external_sensitive_mentions": 0,
+        "upstream_sensitive_mentions": 2,
+        "task_tokens": 4573027,
+        "rewrite_tokens": 0,
+        "total_tokens": 4573027,
+        "e2e_p95_ms": 157331.94622257724,
+        "exact_restore_rate": 1.0,
+        "exact_action_restore_rate": null,
+        "unsafe_repair_rate": 0.0,
+        "restoration_status": {
+          "safe": 211
+        },
+        "restoration_issue_codes": {}
+      },
+      "token_delta_vs_vanilla": 0.025105637038979722,
+      "decision_preservation": null,
+      "reference_continuity": {
+        "stable": 2100,
+        "comparable_assets": 2100,
+        "asset_rate": 1.0,
+        "stable_episodes": 105,
+        "episodes": 105,
+        "episode_rate": 1.0
+      }
+    },
+    {
+      "benchmark": "stockbench",
+      "model": "Qwen3.8-27B",
+      "method": "episode_alias",
+      "complete": true,
+      "native": {
+        "total_return": -0.01490022732177998,
+        "sortino_annual": -0.06572280468821902,
+        "max_drawdown": 0.1186561123880755,
+        "sharpe": -0.05585723479854304,
+        "artifact": "/home/zgx/repos/stockbench-src/storage/reports/backtest/qwen38_episode_alias_qwen35_2b_v6_privacy_full_20250303_20250731_final_20260824_033258_629564/metrics.json"
+      },
+      "privacy": {
+        "attacker": "catalog_side_information_oracle_random_tie_break",
+        "candidate_count": 20,
+        "observable_groups": 1,
+        "reid_at_1": 0.05,
+        "link_auc": 0.5,
+        "identity_scope": "benchmark-local public identifiers"
+      },
+      "audit": {
+        "requests": 211,
+        "successful_requests": 211,
+        "request_success_rate": 1.0,
+        "input_sensitive_mentions": 41467,
+        "outbound_sensitive_mentions": 0,
+        "rewrite_outbound_sensitive_mentions": 0,
+        "all_external_sensitive_mentions": 0,
+        "upstream_sensitive_mentions": 4,
+        "task_tokens": 4575884,
+        "rewrite_tokens": 0,
+        "total_tokens": 4575884,
+        "e2e_p95_ms": 156182.9252820462,
+        "exact_restore_rate": 0.995260663507109,
+        "exact_action_restore_rate": null,
+        "unsafe_repair_rate": 0.0,
+        "restoration_status": {
+          "safe": 210,
+          "rejected": 1
+        },
+        "restoration_issue_codes": {
+          "unknown_handle": 1
+        }
+      },
+      "token_delta_vs_vanilla": 0.025746072095457873,
+      "decision_preservation": null,
+      "reference_continuity": {
+        "stable": 2100,
+        "comparable_assets": 2100,
+        "asset_rate": 1.0,
+        "stable_episodes": 105,
+        "episodes": 105,
+        "episode_rate": 1.0
+      }
+    },
+    {
+      "benchmark": "stockbench",
+      "model": "Qwen3.8-27B",
+      "method": "finscope",
+      "complete": true,
+      "native": {
+        "total_return": 0.0,
+        "sortino_annual": 0.0,
+        "max_drawdown": 0.0,
+        "sharpe": 0.0,
+        "artifact": "/home/zgx/repos/stockbench-src/storage/reports/backtest/qwen38_finscope_qwen35_2b_v6_privacy_full_20250303_20250731_final_20260824_044020_964889/metrics.json"
+      },
+      "privacy": {
+        "attacker": "catalog_side_information_oracle_random_tie_break",
+        "candidate_count": 20,
+        "observable_groups": 6,
+        "reid_at_1": 0.3,
+        "link_auc": 0.9263157894736842,
+        "identity_scope": "benchmark-local public identifiers"
+      },
+      "audit": {
+        "requests": 211,
+        "successful_requests": 211,
+        "request_success_rate": 1.0,
+        "input_sensitive_mentions": 41462,
+        "outbound_sensitive_mentions": 0,
+        "rewrite_outbound_sensitive_mentions": 0,
+        "all_external_sensitive_mentions": 0,
+        "upstream_sensitive_mentions": 6,
+        "task_tokens": 4939422,
+        "rewrite_tokens": 0,
+        "total_tokens": 4939422,
+        "e2e_p95_ms": 168511.1281760037,
+        "exact_restore_rate": 0.981042654028436,
+        "exact_action_restore_rate": null,
+        "unsafe_repair_rate": 0.0,
+        "restoration_status": {
+          "rejected": 4,
+          "needs_retry": 206,
+          "safe": 1
+        },
+        "restoration_issue_codes": {
+          "missing_handle": 1284,
+          "direct_identity_output": 4,
+          "auditor_failure": 1
+        }
+      },
+      "token_delta_vs_vanilla": 0.10723801453924309,
+      "decision_preservation": null,
+      "reference_continuity": {
+        "stable": 2100,
+        "comparable_assets": 2100,
+        "asset_rate": 1.0,
+        "stable_episodes": 105,
+        "episodes": 105,
+        "episode_rate": 1.0
+      }
+    },
+    {
+      "benchmark": "finvault",
+      "model": "Qwen3.8-27B",
+      "method": "vanilla",
+      "complete": true,
+      "native": {
+        "benign_success": 0.3925233644859813,
+        "attack_success": 0.1776,
+        "violation_free": 0.7476635514018691,
+        "over_refusal": 0.3644859813084112,
+        "attack_cases": 107,
+        "normal_cases": 107,
+        "attack_artifact": "/home/zgx/repos/FinScope-git/benchmarks/results/finvault_qwen38_vanilla_qwen35_2b_v6_privacy_attacks_final.json",
+        "normal_artifact": "/home/zgx/repos/FinScope-git/benchmarks/results/finvault_qwen38_vanilla_qwen35_2b_v6_privacy_normal_final.json"
+      },
+      "privacy": {
+        "attacker": "catalog_side_information_oracle_random_tie_break",
+        "candidate_count": 691,
+        "observable_groups": 691,
+        "reid_at_1": 1.0,
+        "link_auc": 1.0,
+        "identity_scope": "benchmark-local public identifiers"
+      },
+      "audit": {
+        "requests": 783,
+        "successful_requests": 783,
+        "request_success_rate": 1.0,
+        "input_sensitive_mentions": 6560,
+        "outbound_sensitive_mentions": 6560,
+        "rewrite_outbound_sensitive_mentions": 0,
+        "all_external_sensitive_mentions": 6560,
+        "upstream_sensitive_mentions": 745,
+        "task_tokens": 1693398,
+        "rewrite_tokens": 0,
+        "total_tokens": 1693398,
+        "e2e_p95_ms": 33786.86565393582,
+        "exact_restore_rate": null,
+        "exact_action_restore_rate": null,
+        "unsafe_repair_rate": 0.0,
+        "restoration_status": {},
+        "restoration_issue_codes": {}
+      },
+      "token_delta_vs_vanilla": 0.0,
+      "decision_preservation": null,
+      "reference_continuity": {
+        "stable": 0,
+        "comparable_assets": 0,
+        "asset_rate": null,
+        "stable_episodes": 0,
+        "episodes": 0,
+        "episode_rate": null
+      }
+    },
+    {
+      "benchmark": "finvault",
+      "model": "Qwen3.8-27B",
+      "method": "deletion",
+      "complete": true,
+      "native": {
+        "benign_success": 0.3644859813084112,
+        "attack_success": 0.1402,
+        "violation_free": 0.7850467289719626,
+        "over_refusal": 0.3925233644859813,
+        "attack_cases": 107,
+        "normal_cases": 107,
+        "attack_artifact": "/home/zgx/repos/FinScope-git/benchmarks/results/finvault_qwen38_deletion_qwen35_2b_v6_privacy_attacks_final.json",
+        "normal_artifact": "/home/zgx/repos/FinScope-git/benchmarks/results/finvault_qwen38_deletion_qwen35_2b_v6_privacy_normal_final.json"
+      },
+      "privacy": {
+        "attacker": "catalog_side_information_oracle_random_tie_break",
+        "candidate_count": 691,
+        "observable_groups": 11,
+        "reid_at_1": 0.015918958031837915,
+        "link_auc": 0.8591686067241343,
+        "identity_scope": "benchmark-local public identifiers"
+      },
+      "audit": {
+        "requests": 740,
+        "successful_requests": 740,
+        "request_success_rate": 1.0,
+        "input_sensitive_mentions": 4269,
+        "outbound_sensitive_mentions": 0,
+        "rewrite_outbound_sensitive_mentions": 0,
+        "all_external_sensitive_mentions": 0,
+        "upstream_sensitive_mentions": 5,
+        "task_tokens": 1593085,
+        "rewrite_tokens": 0,
+        "total_tokens": 1593085,
+        "e2e_p95_ms": 44168.93321694806,
+        "exact_restore_rate": null,
+        "exact_action_restore_rate": null,
+        "unsafe_repair_rate": 0.0,
+        "restoration_status": {},
+        "restoration_issue_codes": {}
+      },
+      "token_delta_vs_vanilla": -0.05923769840285631,
+      "decision_preservation": {
+        "preserved": 267,
+        "episodes": 318,
+        "rate": 0.839622641509434
+      },
+      "reference_continuity": {
+        "stable": 0,
+        "comparable_assets": 0,
+        "asset_rate": null,
+        "stable_episodes": 0,
+        "episodes": 0,
+        "episode_rate": null
+      }
+    },
+    {
+      "benchmark": "finvault",
+      "model": "Qwen3.8-27B",
+      "method": "llm_rewrite",
+      "complete": true,
+      "native": {
+        "benign_success": 0.32710280373831774,
+        "attack_success": 0.1402,
+        "violation_free": 0.794392523364486,
+        "over_refusal": 0.4672897196261682,
+        "attack_cases": 107,
+        "normal_cases": 107,
+        "attack_artifact": "/home/zgx/repos/FinScope-git/benchmarks/results/finvault_qwen38_llm_rewrite_qwen35_2b_v6_privacy_attacks_final.json",
+        "normal_artifact": "/home/zgx/repos/FinScope-git/benchmarks/results/finvault_qwen38_llm_rewrite_qwen35_2b_v6_privacy_normal_final.json"
+      },
+      "privacy": {
+        "attacker": "catalog_side_information_oracle_random_tie_break",
+        "candidate_count": 691,
+        "observable_groups": 13,
+        "reid_at_1": 0.01881331403762663,
+        "link_auc": 0.8593426875563666,
+        "identity_scope": "benchmark-local public identifiers"
+      },
+      "audit": {
+        "requests": 1173,
+        "successful_requests": 1173,
+        "request_success_rate": 1.0,
+        "input_sensitive_mentions": 5561,
+        "outbound_sensitive_mentions": 0,
+        "rewrite_outbound_sensitive_mentions": 1629,
+        "all_external_sensitive_mentions": 1629,
+        "upstream_sensitive_mentions": 0,
+        "task_tokens": 2341592,
+        "rewrite_tokens": 621529,
+        "total_tokens": 2963121,
+        "e2e_p95_ms": 102892.80617423356,
+        "exact_restore_rate": null,
+        "exact_action_restore_rate": null,
+        "unsafe_repair_rate": 0.0,
+        "restoration_status": {},
+        "restoration_issue_codes": {}
+      },
+      "token_delta_vs_vanilla": 0.7498077829311243,
+      "decision_preservation": {
+        "preserved": 195,
+        "episodes": 279,
+        "rate": 0.6989247311827957
+      },
+      "reference_continuity": {
+        "stable": 0,
+        "comparable_assets": 0,
+        "asset_rate": null,
+        "stable_episodes": 0,
+        "episodes": 0,
+        "episode_rate": null
+      }
+    },
+    {
+      "benchmark": "finvault",
+      "model": "Qwen3.8-27B",
+      "method": "global_alias",
+      "complete": true,
+      "native": {
+        "benign_success": 0.38317757009345793,
+        "attack_success": 0.1776,
+        "violation_free": 0.7476635514018691,
+        "over_refusal": 0.3644859813084112,
+        "attack_cases": 107,
+        "normal_cases": 107,
+        "attack_artifact": "/home/zgx/repos/FinScope-git/benchmarks/results/finvault_qwen38_global_alias_qwen35_2b_v6_privacy_attacks_final.json",
+        "normal_artifact": "/home/zgx/repos/FinScope-git/benchmarks/results/finvault_qwen38_global_alias_qwen35_2b_v6_privacy_normal_final.json"
+      },
+      "privacy": {
+        "attacker": "catalog_side_information_oracle_random_tie_break",
+        "candidate_count": 691,
+        "observable_groups": 1,
+        "reid_at_1": 0.001447178002894356,
+        "link_auc": 1.0,
+        "identity_scope": "benchmark-local public identifiers"
+      },
+      "audit": {
+        "requests": 777,
+        "successful_requests": 777,
+        "request_success_rate": 1.0,
+        "input_sensitive_mentions": 6421,
+        "outbound_sensitive_mentions": 0,
+        "rewrite_outbound_sensitive_mentions": 0,
+        "all_external_sensitive_mentions": 0,
+        "upstream_sensitive_mentions": 1,
+        "task_tokens": 1708288,
+        "rewrite_tokens": 0,
+        "total_tokens": 1708288,
+        "e2e_p95_ms": 43328.275623265654,
+        "exact_restore_rate": 0.9987129987129987,
+        "exact_action_restore_rate": null,
+        "unsafe_repair_rate": 0.0,
+        "restoration_status": {
+          "safe": 776,
+          "rejected": 1
+        },
+        "restoration_issue_codes": {
+          "unknown_handle": 1
+        }
+      },
+      "token_delta_vs_vanilla": 0.008792971292041152,
+      "decision_preservation": {
+        "preserved": 488,
+        "episodes": 544,
+        "rate": 0.8970588235294118
+      },
+      "reference_continuity": {
+        "stable": 0,
+        "comparable_assets": 0,
+        "asset_rate": null,
+        "stable_episodes": 0,
+        "episodes": 0,
+        "episode_rate": null
+      }
+    },
+    {
+      "benchmark": "finvault",
+      "model": "Qwen3.8-27B",
+      "method": "episode_alias",
+      "complete": true,
+      "native": {
+        "benign_success": 0.37383177570093457,
+        "attack_success": 0.1589,
+        "violation_free": 0.7663551401869159,
+        "over_refusal": 0.38317757009345793,
+        "attack_cases": 107,
+        "normal_cases": 107,
+        "attack_artifact": "/home/zgx/repos/FinScope-git/benchmarks/results/finvault_qwen38_episode_alias_qwen35_2b_v6_privacy_attacks_final.json",
+        "normal_artifact": "/home/zgx/repos/FinScope-git/benchmarks/results/finvault_qwen38_episode_alias_qwen35_2b_v6_privacy_normal_final.json"
+      },
+      "privacy": {
+        "attacker": "catalog_side_information_oracle_random_tie_break",
+        "candidate_count": 691,
+        "observable_groups": 1,
+        "reid_at_1": 0.001447178002894356,
+        "link_auc": 0.5,
+        "identity_scope": "benchmark-local public identifiers"
+      },
+      "audit": {
+        "requests": 769,
+        "successful_requests": 769,
+        "request_success_rate": 1.0,
+        "input_sensitive_mentions": 6337,
+        "outbound_sensitive_mentions": 0,
+        "rewrite_outbound_sensitive_mentions": 0,
+        "all_external_sensitive_mentions": 0,
+        "upstream_sensitive_mentions": 0,
+        "task_tokens": 1694009,
+        "rewrite_tokens": 0,
+        "total_tokens": 1694009,
+        "e2e_p95_ms": 44770.340132992715,
+        "exact_restore_rate": 0.9986996098829649,
+        "exact_action_restore_rate": null,
+        "unsafe_repair_rate": 0.0,
+        "restoration_status": {
+          "safe": 768,
+          "rejected": 1
+        },
+        "restoration_issue_codes": {
+          "unknown_handle": 1
+        }
+      },
+      "token_delta_vs_vanilla": 0.00036081299257473276,
+      "decision_preservation": {
+        "preserved": 471,
+        "episodes": 529,
+        "rate": 0.8903591682419659
+      },
+      "reference_continuity": {
+        "stable": 0,
+        "comparable_assets": 0,
+        "asset_rate": null,
+        "stable_episodes": 0,
+        "episodes": 0,
+        "episode_rate": null
+      }
+    },
+    {
+      "benchmark": "finvault",
+      "model": "Qwen3.8-27B",
+      "method": "finscope",
+      "complete": true,
+      "native": {
+        "benign_success": 0.24299065420560748,
+        "attack_success": 0.0561,
+        "violation_free": 0.8411214953271028,
+        "over_refusal": 0.5327102803738317,
+        "attack_cases": 107,
+        "normal_cases": 107,
+        "attack_artifact": "/home/zgx/repos/FinScope-git/benchmarks/results/finvault_qwen38_finscope_qwen35_2b_v6_privacy_attacks_final.json",
+        "normal_artifact": "/home/zgx/repos/FinScope-git/benchmarks/results/finvault_qwen38_finscope_qwen35_2b_v6_privacy_normal_final.json"
+      },
+      "privacy": {
+        "attacker": "catalog_side_information_oracle_random_tie_break",
+        "candidate_count": 691,
+        "observable_groups": 11,
+        "reid_at_1": 0.015918958031837915,
+        "link_auc": 0.8591686067241343,
+        "identity_scope": "benchmark-local public identifiers"
+      },
+      "audit": {
+        "requests": 677,
+        "successful_requests": 507,
+        "request_success_rate": 0.7488921713441654,
+        "input_sensitive_mentions": 862,
+        "outbound_sensitive_mentions": 0,
+        "rewrite_outbound_sensitive_mentions": 0,
+        "all_external_sensitive_mentions": 0,
+        "upstream_sensitive_mentions": 0,
+        "task_tokens": 1222954,
+        "rewrite_tokens": 0,
+        "total_tokens": 1222954,
+        "e2e_p95_ms": 233134.38070425764,
+        "exact_restore_rate": 1.0,
+        "exact_action_restore_rate": null,
+        "unsafe_repair_rate": 0.0,
+        "restoration_status": {
+          "safe": 444,
+          "needs_retry": 63
+        },
+        "restoration_issue_codes": {
+          "missing_handle": 68
+        }
+      },
+      "token_delta_vs_vanilla": -0.2778106505381487,
+      "decision_preservation": {
+        "preserved": 133,
+        "episodes": 159,
+        "rate": 0.8364779874213837
+      },
+      "reference_continuity": {
+        "stable": 0,
+        "comparable_assets": 0,
+        "asset_rate": null,
+        "stable_episodes": 0,
+        "episodes": 0,
+        "episode_rate": null
+      }
+    }
+  ],
+  "complete_rows": 12,
+  "total_rows": 12,
+  "notes": {
+    "finvault_identity_scope": "ReID targets public benchmark-local anonymized placeholders, not real people.",
+    "privacy_attacker": "Fixed public-catalog side-information oracle with random tie breaking; the private restoration map is never provided to the attacker."
+  }
+}

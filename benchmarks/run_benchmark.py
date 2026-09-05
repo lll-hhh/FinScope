@@ -19,6 +19,7 @@ import statistics
 import time
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 from urllib import request
+from urllib.error import HTTPError
 
 from finscope import ActionValidationError, FinScopeMediator
 
@@ -172,8 +173,18 @@ class OpenAIBackend:
             method="POST",
         )
         started = time.perf_counter()
-        with request.urlopen(req, timeout=180) as response:
-            document = json.loads(response.read().decode("utf-8"))
+        document = None
+        for attempt in range(3):
+            try:
+                with request.urlopen(req, timeout=180) as response:
+                    document = json.loads(response.read().decode("utf-8"))
+                break
+            except HTTPError as exc:
+                if exc.code not in {404, 502, 503, 504} or attempt == 2:
+                    raise
+                time.sleep(1.5 * (attempt + 1))
+        if document is None:
+            raise RuntimeError("OpenAI-compatible backend returned no response")
         latency_ms = (time.perf_counter() - started) * 1000
         text = document["choices"][0]["message"]["content"]
         usage = document.get("usage", {})
