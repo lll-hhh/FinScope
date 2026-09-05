@@ -228,6 +228,31 @@ class PrivacyAgentTests(unittest.TestCase):
         self.assertEqual(result.status, "needs_retry")
         self.assertEqual(before, after)
 
+    def test_model_auditor_warning_does_not_block_execution(self) -> None:
+        auditor = JsonModelRecoveryAuditor(
+            lambda _prompt: json.dumps(
+                {
+                    "issues": [
+                        {
+                            "code": "semantic_drift",
+                            "severity": "warning",
+                            "message": "uncertain wording",
+                            "aliases": [],
+                        }
+                    ]
+                }
+            )
+        )
+        agent = LocalPrivacyAgent(CATALOG, recovery_auditor=auditor)
+        scope = agent.open_scope("audit-warning", "2026-08-21")
+        safe = agent.sanitize(
+            {"asset": "贵州茅台", "action": "buy", "quantity": 1},
+            scope,
+            disclosure_level="P3",
+        )
+        result = agent.validate_action(safe, scope)
+        self.assertEqual(result.action["asset"], "贵州茅台")
+
 
 if __name__ == "__main__":
     unittest.main()

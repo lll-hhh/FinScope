@@ -809,7 +809,11 @@ class LocalPrivacyAgent:
         if status == "rejected":
             state.metrics["restoration_rejections"] += 1
         result = RestorationResult(restored, status, tuple(issues))
-        if execution and not result.safe:
+        # Warnings from the model auditor are advisory.  Deterministic
+        # structural errors (unknown/mismatched handles, missing executable
+        # handles) and explicit auditor errors still block execution, while a
+        # model's uncertain semantic warning must not reject a valid action.
+        if execution and any(item.severity == "error" for item in issues):
             raise AmbiguousRestorationError(
                 "restoration audit failed: %s" % ", ".join(item.code for item in issues)
             )
