@@ -86,9 +86,11 @@ def main() -> None:
             "method_filter": estimator_method,
             "source": str(args.attack_artifact),
         },
-        # Keep the labelled rows alongside the calibration metadata so a
-        # remote proxy can be started from one immutable artifact.
-        "rows": attack_rows,
+        # ``rows`` is deliberately restricted to the selected method because
+        # the proxy loads this field for its online estimator. Keep the full
+        # attack table separately for reporting and auditability.
+        "rows": estimator_rows,
+        "attack_rows": attack_rows,
         "protocol": "development-only threshold selection; test split is untouched",
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
