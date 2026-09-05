@@ -57,6 +57,7 @@ class ProviderAndBenchmarkTests(unittest.TestCase):
         model = OpenAICompatibleChatModel(profile, client=client)
         self.assertEqual(model("hello"), "ok")
         self.assertEqual(client.chat.completions.kwargs["extra_headers"], {"X-Test": "token"})
+        self.assertNotIn("extra_body", client.chat.completions.kwargs)
         self.assertNotIn("secret", repr(profile.redacted()))
         self.assertNotIn("token", repr(profile.redacted()))
 

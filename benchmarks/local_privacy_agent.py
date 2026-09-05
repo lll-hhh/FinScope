@@ -59,6 +59,10 @@ def build_model_assisted_agent(
             base_url=config.base_url,
             api_key="local",
             temperature=0.0,
+            # Qwen3.5 vLLM exposes reasoning by default.  The local Agent
+            # roles require bounded JSON, so disable reasoning at the chat
+            # template boundary rather than parsing hidden thought text.
+            extra_body={"chat_template_kwargs": {"enable_thinking": False}},
         )
     )
     def structured_call(prompt: str) -> str:

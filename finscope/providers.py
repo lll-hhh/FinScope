@@ -16,6 +16,7 @@ class ModelProfile:
     base_url: str
     api_key: str = field(default="", repr=False)
     extra_headers: Mapping[str, str] = field(default_factory=dict, repr=False)
+    extra_body: Mapping[str, Any] = field(default_factory=dict, repr=False)
     temperature: float = 0.0
 
     def redacted(self) -> Dict[str, Any]:
@@ -25,6 +26,7 @@ class ModelProfile:
             "base_url": self.base_url,
             "api_key_configured": bool(self.api_key),
             "header_names": sorted(self.extra_headers),
+            "body_keys": sorted(self.extra_body),
             "temperature": self.temperature,
         }
 
@@ -74,6 +76,8 @@ class OpenAICompatibleChatModel:
             kwargs["max_tokens"] = max_tokens
         if self.profile.extra_headers:
             kwargs["extra_headers"] = dict(self.profile.extra_headers)
+        if self.profile.extra_body:
+            kwargs["extra_body"] = dict(self.profile.extra_body)
         started = time.perf_counter()
         try:
             response = self._client.chat.completions.create(**kwargs)

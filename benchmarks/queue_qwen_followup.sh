@@ -11,7 +11,7 @@ TASK_MODEL_NAME=${TASK_MODEL_NAME:-Qwen3.8-27B}
 QUEUE_ROOT=${QUEUE_ROOT:-/home/zgx/runlogs/finscope_qwen_20260826}
 SELECT_ROOT=${SELECT_ROOT:-$QUEUE_ROOT/local_model_selection}
 PRIVACY_PORT=${PRIVACY_PORT:-8120}
-PRIVACY_URL="http://127.0.0.1:${PRIVACY_PORT}/v1"
+PRIVACY_URL=${PRIVACY_URL_OVERRIDE:-"http://127.0.0.1:${PRIVACY_PORT}/v1"}
 PRIVACY_NAME=${PRIVACY_NAME:-selected-local-privacy}
 PRIVACY_TAG=${PRIVACY_TAG:-qwen25_3b}
 EXTERNAL_ROOT=${EXTERNAL_ROOT:-$QUEUE_ROOT/selected_external_matrix}
@@ -19,6 +19,7 @@ NLPCC_OUT=${NLPCC_OUT:-$QUEUE_ROOT/nlpcc_selected_local}
 LOCAL_PRIVACY_MODEL_PATH=${LOCAL_PRIVACY_MODEL_PATH:-}
 LOCAL_PRIVACY_MODEL_ID=${LOCAL_PRIVACY_MODEL_ID:-}
 LOCAL_PRIVACY_MODEL_NAME=${LOCAL_PRIVACY_MODEL_NAME:-}
+LOCAL_PRIVACY_PARAMETERS_B=${LOCAL_PRIVACY_PARAMETERS_B:-3.0}
 
 mkdir -p "$QUEUE_ROOT" "$NLPCC_OUT" "$EXTERNAL_ROOT" "$ROOT/artifacts"
 exec > >(tee -a "$QUEUE_ROOT/followup_queue.log") 2>&1
@@ -64,7 +65,7 @@ payload = {
     "model_id": os.environ.get("LOCAL_PRIVACY_MODEL_ID") or "Qwen/Qwen2.5-3B-Instruct",
     "model_name": os.environ.get("LOCAL_PRIVACY_MODEL_NAME") or "Qwen2.5-3B-Instruct",
     "local_path": os.environ["LOCAL_PRIVACY_MODEL_PATH"],
-    "parameters_b": 3.0,
+    "parameters_b": float(os.environ.get("LOCAL_PRIVACY_PARAMETERS_B") or 3.0),
     "fallback_allowed": True,
 }
 payload["chosen"] = dict(payload)
@@ -122,6 +123,12 @@ PY
 start_privacy_server() {
   local model_path=$1
   local log="$QUEUE_ROOT/selected_privacy_server.log"
+  if [[ -n "${PRIVACY_URL_OVERRIDE:-}" ]]; then
+    local health_base="${PRIVACY_URL_OVERRIDE%/v1}"
+    wait_health "$health_base"
+    echo "using pre-existing local privacy service: $PRIVACY_URL_OVERRIDE"
+    return 0
+  fi
   "$PYTHON" -u "$ROOT/benchmarks/serve_transformers_openai.py" \
     --model "$model_path" --device cuda:4 --served-model-name "$PRIVACY_NAME" \
     --max-output-tokens 512 --format-guard --json-grammar \
