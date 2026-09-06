@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 import random
 import re
+import sys
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 from benchmarks.llm_privacy_attacker import (
@@ -103,6 +104,41 @@ def _candidate_profile(
             for day in _sample_days(days)
         }
     return profile
+
+
+def _nlpcc_market_profiles(
+    root: Path, assets: Sequence[str], days: Sequence[str]
+) -> Dict[str, Dict[str, Any]]:
+    """Load permitted K3 public history through the official NLPCC loader."""
+
+    tasks_root = root / "repo" / "NLPCC_tasks"
+    dataset_root = root / "lfs" / "NLPCC_tasks" / "dataset"
+    if not tasks_root.is_dir() or not dataset_root.is_dir():
+        raise FileNotFoundError(f"invalid NLPCC root for K3 prior: {root}")
+    sys.path.insert(0, str(tasks_root))
+    from dataset.dataloader_eval import DataLoader
+
+    loader = DataLoader(
+        str(dataset_root / "price_data" / "export_data"),
+        str(dataset_root / "news_data" / "export_data"),
+    )
+    profiles: Dict[str, Dict[str, Any]] = {asset: {} for asset in assets}
+    for day in _sample_days(days):
+        date_value = int(day.replace("-", ""))
+        history = loader.get_historical_prices(list(assets), date_value, 6)
+        for asset in assets:
+            rows = history.get(asset, [])
+            if not rows:
+                continue
+            latest = rows[-1]
+            public_values = {}
+            for key in ("open", "close", "pct_change"):
+                value = latest.get(key)
+                if isinstance(value, (int, float)):
+                    public_values[key] = float(f"{float(value):.5g}")
+            if public_values:
+                profiles[asset][day] = public_values
+    return profiles
 
 
 def _snippets(text: str, alias: str, *, radius: int = 220, maximum: int = 4) -> List[str]:
@@ -404,12 +440,19 @@ def nlpcc_batches(
         for asset, (name, descriptor) in FUND_PROFILES.items()
     ]
     entry_by_id = {entry.canonical_id: entry for entry in entries}
+    market_cache: Dict[Tuple[str, ...], Dict[str, Dict[str, Any]]] = {}
     for method in methods:
         method_rows = [row for row in records if row.get("method") == method]
         days = sorted({str(row.get("date", "")) for row in method_rows})
         for requested_length in trace_lengths:
             selected_days = days if requested_length == 0 else days[:requested_length]
             selected = [row for row in method_rows if str(row.get("date")) in set(selected_days)]
+            market_key = tuple(selected_days)
+            if market_key not in market_cache:
+                market_cache[market_key] = _nlpcc_market_profiles(
+                    nlpcc_root, FUND_POOL, selected_days
+                )
+            market_profiles = market_cache[market_key]
             for prior in prior_levels:
                 grouped: Dict[str, List[Tuple[str, Dict[str, Any]]]] = defaultdict(list)
                 nodes: List[Tuple[str, str, str, str, Dict[str, Any]]] = []
@@ -443,7 +486,14 @@ def nlpcc_batches(
                     candidates=[
                         IdentityCandidate(
                             entry.canonical_id,
-                            _candidate_profile(entry, prior),
+                            {
+                                **_candidate_profile(entry, prior),
+                                **(
+                                    {"public_market_history": market_profiles[entry.canonical_id]}
+                                    if prior in {"K3", "K4"}
+                                    else {}
+                                ),
+                            },
                         )
                         for entry in entries
                     ],

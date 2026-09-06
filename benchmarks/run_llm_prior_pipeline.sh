@@ -8,6 +8,7 @@ ROOT=${FINSCOPE_ROOT:-/home/zgx/repos/FinScope-git}
 PYTHON=${PYTHON:-/home/zgx/venvs/finscope-qwen38/bin/python}
 STOCKBENCH_ROOT=${STOCKBENCH_ROOT:-/home/zgx/repos/stockbench-src}
 FINVAULT_ROOT=${FINVAULT_ROOT:-/home/zgx/repos/FinVault-src}
+NLPCC_ROOT=${NLPCC_ROOT:-/home/zgx/data/nlpcc2026_20260818}
 BASE=${BASE:-/home/zgx/runlogs/finscope_qwen35_4b_20260906}
 CURRENT_FULL=${CURRENT_FULL:-$BASE/external_full}
 BASELINES_READY=${BASELINES_READY:-$CURRENT_FULL/LLM_REWRITE_RERUN_COMPLETE}
@@ -175,7 +176,7 @@ if [[ ! -f "$NLPCC_RESULT" ]]; then
 fi
 "$PYTHON" -u -m benchmarks.run_llm_privacy_attacks \
   --benchmark nlpcc --nlpcc-result "$NLPCC_RESULT" \
-  --benchmark-root "$ROOT" --methods fixed_alias episode_alias finscope \
+  --benchmark-root "$NLPCC_ROOT" --methods fixed_alias episode_alias finscope \
   --prior-levels K1 K2 K3 K4 --trace-lengths 1 5 20 60 0 \
   "${ATTACK_COMMON[@]}" \
   --output "$FULL_ROOT/nlpcc_llm_prior_attack.json" \
