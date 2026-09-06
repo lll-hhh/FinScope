@@ -76,7 +76,6 @@ run_candidate() {
       "$threshold" "$RISK_ARTIFACT"
     date -Is > "$target/COMPLETE"
   fi
-  run_attack "$target" "$target/llm_attack.json" --methods finscope
 }
 
 run_candidate 0.20 4 & c20=$!
@@ -84,6 +83,10 @@ run_candidate 0.40 5 & c40=$!
 run_candidate 0.60 6 & c60=$!
 wait "$c20" "$c40" "$c60"
 run_candidate 0.80 4
+for compact in 020 040 060 080; do
+  run_attack "$PIPELINE_ROOT/candidate_t${compact}" \
+    "$PIPELINE_ROOT/candidate_t${compact}/llm_attack.json" --methods finscope
+done
 
 UTILITY="$PIPELINE_ROOT/utility_sweep.json"
 "$PYTHON" -m benchmarks.build_adaptive_utility_artifact \
@@ -153,6 +156,7 @@ FINVAULT_ATTACK="$FULL_ROOT/finvault_llm_prior_attack.json"
   "${ATTACK_COMMON[@]}" --max-candidates 100 \
   --output "$FINVAULT_ATTACK" \
   --prompt-audit "$FULL_ROOT/finvault_llm_prior_prompt_inputs.jsonl"
+date -Is > "$FULL_ROOT/EXTERNAL_ATTACKS_COMPLETE"
 
 # Keep utility/cost rows from the already-running baselines and combine them
 # with the freshly calibrated protected methods without overwriting either run.
