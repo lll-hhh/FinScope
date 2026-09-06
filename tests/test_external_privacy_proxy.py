@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from dataclasses import replace
 import tempfile
 import unittest
 
@@ -76,6 +77,45 @@ class ExternalPrivacyProxyTests(unittest.TestCase):
             controller.transform(first, "backtest-002")
             controller.transform(next_day, "backtest-002")
             self.assertTrue(controller.adaptive_context["backtest-002"]["day_boundary"])
+
+    def test_pending_rotation_occurs_before_first_request_of_next_day(self):
+        with tempfile.TemporaryDirectory() as directory:
+            controller = PrivacyController(
+                replace(
+                    config("finscope", Path(directory) / "audit.jsonl"),
+                    adaptive_threshold=0.01,
+                ),
+                stockbench_catalog(),
+            )
+            first_request = {
+                "finscope_task": "backtest-rotation",
+                "finscope_episode": "2025-03-03",
+                "finscope_role": "fundamental_filter",
+                "messages": [{"role": "user", "content": "Analyze AAPL"}],
+            }
+            first_outbound, first_state = controller.transform(
+                first_request, "backtest-rotation"
+            )
+            first_scope = first_state[1]
+            pending = controller.observe_adaptive(
+                "backtest-rotation", output={}, restoration_status="safe"
+            )
+            self.assertEqual(pending["decision"], "replace_at_checkpoint")
+
+            second_outbound, second_state = controller.transform(
+                {**first_request, "finscope_episode": "2025-03-04"},
+                "backtest-rotation",
+            )
+            second_scope = second_state[1]
+            self.assertNotEqual(first_scope.id, second_scope.id)
+            self.assertNotEqual(
+                first_outbound["messages"][0]["content"],
+                second_outbound["messages"][0]["content"],
+            )
+            self.assertEqual(
+                controller.adaptive_context["backtest-rotation"]["pre_rotation"]["timing"],
+                "before_external_request",
+            )
 
     def test_episode_alias_rotates_and_restores(self):
         catalog = IdentityCatalog(stockbench_catalog())

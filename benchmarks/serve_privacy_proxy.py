@@ -642,11 +642,37 @@ class PrivacyController:
             trading_day = self.trading_day(payload, episode)
             agent, scope = self._finscope(episode, trading_day)
             controller = self.adaptive_controllers[episode]
+            runtime = self.adaptive_runtimes[episode]
             previous_context = self.adaptive_context.get(episode, {})
             day_boundary = bool(
                 previous_context.get("trading_day")
                 and previous_context.get("trading_day") != trading_day
             )
+            pre_rotation = None
+            if day_boundary:
+                boundary_risk = controller.estimator.predict(controller.exposure)
+                if boundary_risk.combined >= controller.threshold:
+                    new_scope, reset = runtime.rotate_at_checkpoint(
+                        scope,
+                        {
+                            "task_phase": previous_context.get("phase", ""),
+                            "previous_trading_day": previous_context.get("trading_day", ""),
+                            "next_trading_day": trading_day,
+                        },
+                        trading_day=trading_day,
+                    )
+                    scope = new_scope
+                    self.scopes[episode] = new_scope
+                    self.first_days[episode] = date.fromisoformat(trading_day)
+                    pre_rotation = {
+                        "old_scope_id": reset.old_scope_id,
+                        "new_scope_id": reset.new_scope_id,
+                        "reason": "risk_above_T_at_day_boundary",
+                        "timing": "before_external_request",
+                    }
+                    # The boundary has been consumed before this request. Do
+                    # not rotate again between the two roles of the new day.
+                    day_boundary = False
             role = self.role(payload)
             phase = self.task_phase(role, payload)
             field_risk = self.field_risk(phase, payload)
@@ -686,6 +712,7 @@ class PrivacyController:
                 # current request finishes under the old scope; rotation is
                 # applied after its response, before the next request.
                 "day_boundary": day_boundary,
+                "pre_rotation": pre_rotation,
             }
             return outbound, (agent, scope)
         raise AssertionError("unreachable")
@@ -724,7 +751,7 @@ class PrivacyController:
                 field_risk=int(context.get("field_risk", 1)),
                 purpose=str(context.get("purpose", "research")),
             )
-            rotation = None
+            rotation = context.get("pre_rotation")
             if decision.decision.value != "keep":
                 minimal_state = {
                     "task_phase": phase,
@@ -741,10 +768,14 @@ class PrivacyController:
                     trading_day=str(context.get("trading_day", "")) or None,
                 )
                 self.scopes[episode] = new_scope
+                trading_day = str(context.get("trading_day", ""))
+                if trading_day:
+                    self.first_days[episode] = date.fromisoformat(trading_day)
                 rotation = {
                     "old_scope_id": reset.old_scope_id,
                     "new_scope_id": reset.new_scope_id,
                     "reason": decision.reason,
+                    "timing": "after_external_response",
                 }
             return {
                 "level": decision.level.name,
@@ -759,6 +790,7 @@ class PrivacyController:
                 "reason": decision.reason,
                 "exposure_state": controller.exposure.as_dict(),
                 "rotation": rotation,
+                "rotation_count": controller.rotation_count,
                 "estimator_fitted": controller.estimator.fitted,
             }
 
