@@ -250,10 +250,11 @@ Global Fixed Alias 作为经典 pseudonym 控制保留；Deletion 和 Vanilla �
 #### 任务模型与攻击者模型
 
 - **任务模型（victim/task model）**生成金融决策或工具动作。当前已完成单元使用 Qwen3.8-27B。
-- **当前主攻击者不是语言模型。** `ReID@1` 和 `Link AUC` 由确定性的公开证券主表与行情属性匹配 oracle 计算；它不调用 Qwen、DeepSeek 或 GLM，因此与任务模型独立，所有方法面对完全相同的攻击规则和侧信息。
-- **FinVault 的主攻击同样不需要攻击模型。** Benchmark 提供固定的对抗提示，由作为 victim 的任务模型响应并调用沙箱工具；`Attack Success` 衡量这些提示是否诱导任务模型触发危险状态。只有生成或改写新攻击提示时才需要单独的 attacker model。
-- **LLM attacker 是单独的敏感性实验。** 后续分别使用 Qwen、DeepSeek 和 GLM 读取相同匿名 trace，并显式记录 `victim_model`、`attacker_model`、候选池、查询预算和公开侧信息。即使两者都选 Qwen，也必须作为两个独立角色和调用统计，不能写成“任务模型自己攻击自己”。
-- 主表中的当前攻击结果必须标注 `attacker=public-side-information oracle`；模型攻击结果不进入 S1-S5，只在附录敏感性分析中单独记录，不能替换 oracle 主结果。
+- **主隐私攻击者**固定为无需训练的 Qwen3.5-4B。它读取外部模型真实可见的匿名请求与回复，并在 K1 候选集合、K2 证券主表/静态属性、K3 公开历史行情、K4 跨轮行为四级先验下完成闭集身份排序和跨轨迹关联。
+- **标签严格隔离。** `canonical_id`、`truth_id`、`same_entity` 和本地恢复映射不进入攻击 Prompt；候选项先映射为 `C0001...`，模型输出后才在本地解码判分。逐批 Prompt 输入单独留档以便复核。
+- **指标使用标准定义。** 身份攻击报告 ReID@1、ReID@5 和 MRR；关联攻击报告 ROC-AUC、AUPRC 和 TPR@1%FPR，同时给出样本数、coverage 和 95% CI。旧 Jaccard/公开属性 oracle 仅作为弱攻击 sanity baseline，不再承担主隐私结论。
+- **三个 Benchmark 的时间边界不同。** StockBench 是真实跨交易日长轨迹，NLPCC 是 2025 年连续交易日任务；FinVault 只评估单 episode 内最多 10 轮的跨实体泛化，不将其写成跨日证据。
+- **FinVault `Attack Success` 与隐私攻击不同。** 前者是 Benchmark 原生的危险行为诱导结果，后者是 Qwen3.5-4B 对匿名实体的 ReID/Link 结果；两类安全证据分别报告，不能互相替代。
 
 ## 5. 补充实验表格
 
