@@ -181,6 +181,7 @@ class DayRecord:
     reference_view_count: int = 0
     exact_action_restore: Optional[bool] = None
     attacker_view: Dict[str, Any] = field(default_factory=dict)
+    attacker_bindings: List[Dict[str, str]] = field(default_factory=list)
 
 
 def parse_args() -> argparse.Namespace:
@@ -1512,6 +1513,14 @@ def run(args: argparse.Namespace) -> Dict[str, Any]:
                         "request": outbound,
                         "response": backend_result.text,
                     },
+                    attacker_bindings=[
+                        {
+                            "canonical_id": asset,
+                            "alias": str(alias),
+                            "entity_type": "financial asset",
+                        }
+                        for asset, alias in representation.items()
+                    ],
                 )
             )
             if scope is not None:

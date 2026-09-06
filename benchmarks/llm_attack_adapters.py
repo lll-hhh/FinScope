@@ -161,7 +161,6 @@ def _binding_observation(
     days: Sequence[str],
     roles: Sequence[str],
     occurrences: int,
-    disclosure_levels: Sequence[str],
     snippets: Sequence[str],
     prior: str,
 ) -> Dict[str, Any]:
@@ -175,7 +174,6 @@ def _binding_observation(
             "days": list(days),
             "roles": list(roles),
             "occurrences": occurrences,
-            "disclosure_levels": list(disclosure_levels),
         }
     return observation
 
@@ -301,7 +299,6 @@ def stockbench_batches(
                                 "days": set(),
                                 "roles": set(),
                                 "occurrences": 0,
-                                "levels": set(),
                                 "snippets": [],
                                 "descriptor": str(binding.get("descriptor", "")),
                                 "entity_type": str(binding.get("entity_type", "stock")),
@@ -310,8 +307,6 @@ def stockbench_batches(
                         state["days"].add(day)
                         state["roles"].add(str(row.get("role", "")))
                         state["occurrences"] += max(1, view_text.casefold().count(alias.casefold()))
-                        if binding.get("disclosure_level"):
-                            state["levels"].add(str(binding["disclosure_level"]))
                         for snippet in snippets:
                             if snippet not in state["snippets"]:
                                 state["snippets"].append(snippet)
@@ -322,11 +317,9 @@ def stockbench_batches(
                                 "snippets": [],
                                 "descriptor": state["descriptor"],
                                 "entity_type": state["entity_type"],
-                                "levels": set(),
                             },
                         )
                         node["roles"].add(str(row.get("role", "")))
-                        node["levels"].update(state["levels"])
                         for snippet in snippets:
                             if snippet not in node["snippets"]:
                                 node["snippets"].append(snippet)
@@ -340,7 +333,6 @@ def stockbench_batches(
                         days=days,
                         roles=sorted(state["roles"]),
                         occurrences=int(state["occurrences"]),
-                        disclosure_levels=sorted(state["levels"]),
                         snippets=_sample_values(state["snippets"], 4),
                         prior=prior,
                     )
@@ -360,7 +352,6 @@ def stockbench_batches(
                                 days=[day],
                                 roles=sorted(state["roles"]),
                                 occurrences=1,
-                                disclosure_levels=sorted(state["levels"]),
                                 snippets=_sample_values(state["snippets"], 2),
                                 prior=prior,
                             ),
@@ -454,29 +445,55 @@ def nlpcc_batches(
                 )
             market_profiles = market_cache[market_key]
             for prior in prior_levels:
+                handle_state: Dict[Tuple[str, str], Dict[str, Any]] = {}
                 grouped: Dict[str, List[Tuple[str, Dict[str, Any]]]] = defaultdict(list)
                 nodes: List[Tuple[str, str, str, str, Dict[str, Any]]] = []
                 for row in selected:
-                    outbound = row.get("outbound_action") or {}
-                    restored = row.get("restored_action") or {}
-                    alias = str(outbound.get("asset", ""))
-                    truth = str(restored.get("asset", ""))
-                    if truth not in entry_by_id or not alias:
-                        continue
                     view = row.get("attacker_view", {})
                     text = json.dumps(view, ensure_ascii=False)
-                    observation: Dict[str, Any] = {
-                        "protected_handle": alias,
-                        "visible_context": _snippets(text, alias, radius=350),
-                    }
-                    if prior == "K4":
-                        observation["cross_round_history"] = {
-                            "day": row.get("date"),
-                            "selected_action_visible": True,
-                        }
-                    grouped[truth].append((alias, observation))
-                    nodes.append(
-                        ("nlpcc", str(row.get("date", "")), alias, truth, observation)
+                    for binding in row.get("attacker_bindings", []):
+                        if not isinstance(binding, Mapping):
+                            continue
+                        alias = str(binding.get("alias", ""))
+                        truth = str(binding.get("canonical_id", ""))
+                        snippets = _snippets(text, alias, radius=350)
+                        if truth not in entry_by_id or not alias or not snippets:
+                            continue
+                        state = handle_state.setdefault(
+                            (truth, alias),
+                            {"days": set(), "occurrences": 0, "snippets": []},
+                        )
+                        state["days"].add(str(row.get("date", "")))
+                        state["occurrences"] += text.casefold().count(alias.casefold())
+                        for snippet in snippets:
+                            if snippet not in state["snippets"]:
+                                state["snippets"].append(snippet)
+                        observation = _binding_observation(
+                            alias=alias,
+                            entity_type="financial asset",
+                            days=[str(row.get("date", ""))],
+                            roles=["portfolio_agent"],
+                            occurrences=text.casefold().count(alias.casefold()),
+                            snippets=snippets,
+                            prior=prior,
+                        )
+                        nodes.append(
+                            ("nlpcc", str(row.get("date", "")), alias, truth, observation)
+                        )
+                for (truth, alias), state in sorted(handle_state.items()):
+                    grouped[truth].append(
+                        (
+                            alias,
+                            _binding_observation(
+                                alias=alias,
+                                entity_type="financial asset",
+                                days=sorted(state["days"]),
+                                roles=["portfolio_agent"],
+                                occurrences=int(state["occurrences"]),
+                                snippets=_sample_values(state["snippets"], 4),
+                                prior=prior,
+                            ),
+                        )
                     )
                 yield AttackBatch(
                     benchmark="NLPCC",
@@ -505,11 +522,7 @@ def nlpcc_batches(
                     ),
                     exposure_state={
                         "alias_occurrences": sum(
-                            json.dumps(row.get("attacker_view", {}), ensure_ascii=False)
-                            .casefold()
-                            .count(str((row.get("outbound_action") or {}).get("asset", "")).casefold())
-                            for row in selected
-                            if (row.get("outbound_action") or {}).get("asset")
+                            int(state["occurrences"]) for state in handle_state.values()
                         ),
                         "age_days": max(0, len(selected_days) - 1),
                         "visible_roles": ["portfolio_agent"],
