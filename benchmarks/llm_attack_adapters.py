@@ -208,7 +208,7 @@ def _binding_observation(
 
 
 def _balanced_targets(
-    values: Mapping[str, List[Tuple[str, Dict[str, Any]]]], maximum: int
+    values: Mapping[str, List[Tuple[str, Dict[str, Any]]]], maximum: int, seed: int
 ) -> List[IdentityTarget]:
     selected: List[Tuple[str, str, Dict[str, Any]]] = []
     per_entity = max(1, maximum // max(1, len(values)))
@@ -221,6 +221,7 @@ def _balanced_targets(
         else:
             chosen = [items[0], items[-1]][:per_entity]
         selected.extend((truth, alias, observation) for alias, observation in chosen)
+    random.Random(seed).shuffle(selected)
     selected = selected[:maximum]
     return [
         IdentityTarget(f"target-{index:04d}", truth, observation)
@@ -403,7 +404,7 @@ def stockbench_batches(
                         )
                         for entry in entries
                     ],
-                    identity_targets=_balanced_targets(grouped, max_identity_targets),
+                    identity_targets=_balanced_targets(grouped, max_identity_targets, seed),
                     link_targets=(
                         _link_targets(link_nodes, max_link_pairs, seed)
                         if len(selected_days) > 1
@@ -543,7 +544,7 @@ def nlpcc_batches(
                         )
                         for entry in entries
                     ],
-                    identity_targets=_balanced_targets(grouped, max_identity_targets),
+                    identity_targets=_balanced_targets(grouped, max_identity_targets, seed),
                     link_targets=(
                         _link_targets(nodes, max_link_pairs, seed)
                         if len(selected_days) > 1
@@ -623,13 +624,14 @@ def finvault_batches(
                         except (TypeError, ValueError):
                             step = str(row.get("request_id", ""))
                         nodes.append((episode, step, alias, truth, observation))
-                targets = _balanced_targets(grouped, max_identity_targets)
+                targets = _balanced_targets(grouped, max_identity_targets, seed)
                 truth_ids = {target.truth_id for target in targets}
                 candidate_entries = [entry_by_id[value] for value in sorted(truth_ids)]
                 rng = random.Random(seed)
                 distractors = [entry for entry in entries if entry.canonical_id not in truth_ids]
                 rng.shuffle(distractors)
                 candidate_entries.extend(distractors[: max(0, max_candidates - len(candidate_entries))])
+                rng.shuffle(candidate_entries)
                 yield AttackBatch(
                     benchmark="FinVault",
                     method=method,
