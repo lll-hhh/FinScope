@@ -7,6 +7,7 @@ import json
 import math
 import random
 import re
+import time
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 from finscope import ModelProfile, OpenAICompatibleChatModel
@@ -220,20 +221,23 @@ class LlmPrivacyAttacker:
             {"role": "user", "content": prompt},
         )
         last_error: Optional[Exception] = None
-        for _ in range(2):
+        for attempt in range(3):
             try:
                 return _json_object(
                     self.model.chat(messages, temperature=0.0, max_tokens=self.max_tokens)
                 )
-            except (ValueError, json.JSONDecodeError) as exc:
+            except Exception as exc:
                 last_error = exc
-                messages = messages + (
-                    {
-                        "role": "user",
-                        "content": "The previous response was invalid. Return the JSON object only.",
-                    },
-                )
-        raise ValueError("attacker returned invalid JSON twice") from last_error
+                if isinstance(exc, (ValueError, json.JSONDecodeError)):
+                    messages = messages + (
+                        {
+                            "role": "user",
+                            "content": "The previous response was invalid. Return the JSON object only.",
+                        },
+                    )
+                if attempt < 2:
+                    time.sleep(attempt + 1)
+        raise ValueError("attacker call failed three times") from last_error
 
     def _rank_identities(
         self,
@@ -322,10 +326,20 @@ class LlmPrivacyAttacker:
         return predictions, raw_responses
 
     def attack(self, batch: AttackBatch, *, include_raw: bool = False) -> Dict[str, Any]:
+        if not batch.candidates or not batch.identity_targets:
+            raise ValueError("attack batch requires candidates and identity targets")
         identity_predictions, identity_raw = self._rank_identities(
             batch.candidates, batch.identity_targets
         )
         link_predictions, link_raw = self._score_links(batch.link_targets)
+        identity_coverage = len(identity_predictions) / len(batch.identity_targets)
+        link_coverage = (
+            len(link_predictions) / len(batch.link_targets) if batch.link_targets else None
+        )
+        if identity_coverage < 0.95:
+            raise ValueError(f"identity prediction coverage is only {identity_coverage:.1%}")
+        if link_coverage is not None and link_coverage < 0.95:
+            raise ValueError(f"link prediction coverage is only {link_coverage:.1%}")
 
         top1: List[float] = []
         top5: List[float] = []
@@ -373,11 +387,7 @@ class LlmPrivacyAttacker:
             "trace_length": batch.trace_length,
             "candidate_count": len(batch.candidates),
             "identity_targets": len(batch.identity_targets),
-            "identity_coverage": (
-                len(identity_predictions) / len(batch.identity_targets)
-                if batch.identity_targets
-                else None
-            ),
+            "identity_coverage": identity_coverage,
             "reid_at_1": sum(top1) / len(top1) if top1 else None,
             "reid_at_1_ci95": wilson_interval(int(sum(top1)), len(top1)),
             "reid_at_5": sum(top5) / len(top5) if top5 else None,
@@ -386,11 +396,7 @@ class LlmPrivacyAttacker:
             if reciprocal_ranks
             else None,
             "link_pairs": len(batch.link_targets),
-            "link_coverage": (
-                len(link_predictions) / len(batch.link_targets)
-                if batch.link_targets
-                else None
-            ),
+            "link_coverage": link_coverage,
             "link_auc": roc_auc(labels, scores),
             "link_auc_ci95": stratified_bootstrap_interval(labels, scores, roc_auc),
             "link_auprc": average_precision(labels, scores),

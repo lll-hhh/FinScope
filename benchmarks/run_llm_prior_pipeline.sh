@@ -23,6 +23,15 @@ ATTACK_COMMON=(
 )
 mkdir -p "$PIPELINE_ROOT"
 
+retry() {
+  local attempt
+  for attempt in 1 2 3; do
+    if "$@"; then return 0; fi
+    sleep $((attempt * 10))
+  done
+  return 1
+}
+
 run_stock_lane() {
   local run_root=$1 method=$2 gpu=$3 tag=$4 threshold=$5 calibration=${6:-}
   mkdir -p "$run_root"
@@ -37,7 +46,7 @@ run_stock_lane() {
 run_attack() {
   local audit_root=$1 output=$2
   shift 2
-  "$PYTHON" -u -m benchmarks.run_llm_privacy_attacks \
+  retry "$PYTHON" -u -m benchmarks.run_llm_privacy_attacks \
     --benchmark stockbench --audit-dir "$audit_root" \
     --benchmark-root "$STOCKBENCH_ROOT" "$@" \
     --prior-levels K1 K2 K3 K4 --trace-lengths 1 5 20 0 \
@@ -139,7 +148,7 @@ if [[ ! -f "$FULL_ROOT/TRAJECTORIES_COMPLETE" ]]; then
 fi
 
 STOCK_ATTACK="$FULL_ROOT/stockbench_llm_prior_attack.json"
-"$PYTHON" -u -m benchmarks.run_llm_privacy_attacks \
+retry "$PYTHON" -u -m benchmarks.run_llm_privacy_attacks \
   --benchmark stockbench --audit-dir "$FULL_ROOT" \
   --benchmark-root "$STOCKBENCH_ROOT" \
   --methods fixed_alias episode_alias finscope \
@@ -148,7 +157,7 @@ STOCK_ATTACK="$FULL_ROOT/stockbench_llm_prior_attack.json"
   --prompt-audit "$FULL_ROOT/stockbench_llm_prior_prompt_inputs.jsonl"
 
 FINVAULT_ATTACK="$FULL_ROOT/finvault_llm_prior_attack.json"
-"$PYTHON" -u -m benchmarks.run_llm_privacy_attacks \
+retry "$PYTHON" -u -m benchmarks.run_llm_privacy_attacks \
   --benchmark finvault --audit-dir "$FULL_ROOT" \
   --benchmark-root "$FINVAULT_ROOT" \
   --methods fixed_alias episode_alias finscope \
@@ -178,7 +187,7 @@ if [[ ! -f "$NLPCC_RESULT" ]]; then
   echo "waiting for NLPCC merged result: $NLPCC_RESULT"
   while [[ ! -f "$NLPCC_RESULT" ]]; do sleep 60; done
 fi
-"$PYTHON" -u -m benchmarks.run_llm_privacy_attacks \
+retry "$PYTHON" -u -m benchmarks.run_llm_privacy_attacks \
   --benchmark nlpcc --nlpcc-result "$NLPCC_RESULT" \
   --benchmark-root "$NLPCC_ROOT" --methods fixed_alias episode_alias finscope \
   --prior-levels K1 K2 K3 K4 --trace-lengths 1 5 20 60 0 \

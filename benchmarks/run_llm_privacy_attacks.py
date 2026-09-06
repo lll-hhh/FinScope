@@ -157,6 +157,8 @@ def main() -> None:
             prompt_handle.close()
     errors = sum(row.get("status") != "ok" for row in output["rows"])
     print(f"wrote {args.output}: {len(output['rows'])} rows, {errors} errors", flush=True)
+    if errors:
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":
