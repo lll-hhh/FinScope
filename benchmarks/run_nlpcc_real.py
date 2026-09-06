@@ -26,8 +26,14 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from finscope import (
     ActionValidationError,
+    AdaptiveReplacementController,
+    AdaptiveRuntime,
     AmbiguousRestorationError,
     LocalPrivacyAgent,
+    ReplacementDecision,
+    RiskEstimator,
+    TaskDependencyState,
+    load_risk_estimator,
 )
 from benchmarks.run_benchmark import BackendResult, OpenAIBackend, TransformersBackend
 from benchmarks.local_privacy_agent import (
@@ -182,6 +188,8 @@ class DayRecord:
     exact_action_restore: Optional[bool] = None
     attacker_view: Dict[str, Any] = field(default_factory=dict)
     attacker_bindings: List[Dict[str, str]] = field(default_factory=list)
+    disclosure_level: Optional[str] = None
+    adaptive: Dict[str, Any] = field(default_factory=dict)
 
 
 def parse_args() -> argparse.Namespace:
@@ -226,6 +234,15 @@ def parse_args() -> argparse.Namespace:
         "--disclosure-level",
         choices=("P1", "P2", "P3", "P4", "P5"),
         default="P3",
+    )
+    parser.add_argument(
+        "--adaptive-threshold",
+        type=float,
+        default=float(os.environ.get("FINSCOPE_ADAPTIVE_T", "0.60")),
+    )
+    parser.add_argument(
+        "--adaptive-calibration",
+        default=os.environ.get("FINSCOPE_ADAPTIVE_CALIBRATION", ""),
     )
     parser.add_argument("--methods", nargs="+", choices=METHODS, default=list(METHODS))
     parser.add_argument(
@@ -616,6 +633,7 @@ def prepare_outbound(
     privacy_agent: LocalPrivacyAgent,
     fixed_aliases: Mapping[str, str],
     disclosure_level: str,
+    existing_scope: Optional[Any] = None,
 ) -> Tuple[Dict[str, Any], Optional[Any], Dict[str, str], float]:
     started = time.perf_counter()
     scope = None
@@ -651,10 +669,8 @@ def prepare_outbound(
         representation = dict(fixed_aliases)
     elif method == "finscope":
         trading_day = datetime.strptime(str(date), "%Y%m%d").strftime("%Y-%m-%d")
-        scope = privacy_agent.open_scope(
-            "nlpcc-track1-real",
-            trading_day,
-            conversation_id="qwen38-track1",
+        scope = existing_scope or privacy_agent.open_scope(
+            "nlpcc-track1-real", trading_day, conversation_id="qwen38-track1"
         )
         protected_payload = coarsen_market_features(payload, disclosure_level)
         outbound = privacy_agent.sanitize(
@@ -1268,6 +1284,12 @@ def run_fingerprint(args: argparse.Namespace, dates: Sequence[int]) -> str:
         "max_new_tokens": args.max_new_tokens,
         "privacy_model_base_url": args.privacy_model_base_url,
         "privacy_model_name": args.privacy_model_name,
+        "adaptive_threshold": args.adaptive_threshold,
+        "adaptive_calibration": (
+            hashlib.sha256(Path(args.adaptive_calibration).read_bytes()).hexdigest()
+            if args.adaptive_calibration
+            else ""
+        ),
         "rewrite_cache": [
             hashlib.sha256(Path(path).read_bytes()).hexdigest()
             for path in args.rewrite_cache
@@ -1364,6 +1386,18 @@ def run(args: argparse.Namespace) -> Dict[str, Any]:
         asset: f"FIXED_ASSET_{index:03d}"
         for index, asset in enumerate(FUND_POOL, start=1)
     }
+    risk_estimator = (
+        load_risk_estimator(args.adaptive_calibration)
+        if args.adaptive_calibration
+        else RiskEstimator()
+    )
+    adaptive_controller = AdaptiveReplacementController(
+        risk_estimator,
+        threshold=args.adaptive_threshold,
+        default_level=args.disclosure_level,
+    )
+    adaptive_runtime = AdaptiveRuntime(privacy_agent, adaptive_controller)
+    finscope_scope: Optional[Any] = None
     rewrite_cache = load_rewrite_cache(args.rewrite_cache)
     if saved is None:
         completed_days = 0
@@ -1379,6 +1413,9 @@ def run(args: argparse.Namespace) -> Dict[str, Any]:
             f"resuming after {completed_days}/{len(dates)} completed trading days",
             flush=True,
         )
+    # A process restart is itself treated as a safe external-session boundary;
+    # the new scope starts with fresh handles on the first resumed day.
+    scope_start_day = completed_days + 1
 
     for day_index, date in enumerate(dates[completed_days:], start=completed_days + 1):
         prices = loader.get_price_data(list(FUND_POOL), date)
@@ -1407,14 +1444,30 @@ def run(args: argparse.Namespace) -> Dict[str, Any]:
                 else fixed_aliases
             )
             alias_restore = {alias: asset for asset, alias in aliases.items()}
+            task_phase = (
+                "risk"
+                if any(value > 1e-6 for value in portfolio.holdings.values())
+                else "analysis"
+            )
+            field_risk = 3 if task_phase == "risk" else 2
+            selected_level = args.disclosure_level
+            if method == "finscope":
+                selected_level = adaptive_controller.choose_level(
+                    purpose="portfolio-allocation",
+                    task_phase=task_phase,
+                    field_risk=field_risk,
+                ).name
             outbound, scope, representation, preprocess_ms = prepare_outbound(
                 method,
                 raw_payload,
                 date,
                 privacy_agent,
                 aliases,
-                args.disclosure_level,
+                selected_level,
+                existing_scope=finscope_scope if method == "finscope" else None,
             )
+            if method == "finscope":
+                finscope_scope = scope
             representations[method].append(representation)
             prompt = build_prompt(outbound)
             backend_result: BackendResult = backend.generate(prompt)
@@ -1465,6 +1518,64 @@ def run(args: argparse.Namespace) -> Dict[str, Any]:
                 if method not in {"vanilla", "deletion"}
                 else None
             )
+            adaptive_metrics: Dict[str, Any] = {}
+            if method == "finscope" and scope is not None:
+                alias_occurrences = len(
+                    re.findall(
+                        r"FS_(?:ASSET|ORG|PORTFOLIO|STRATEGY|ACCOUNT|REF|ACTION|REL|INTENT)_[A-Z0-9]+",
+                        json.dumps(outbound, ensure_ascii=False),
+                    )
+                )
+                decision = adaptive_runtime.observe_external_call(
+                    scope,
+                    alias_occurrences=alias_occurrences,
+                    elapsed_days=max(0, day_index - scope_start_day),
+                    visible_roles=("portfolio_agent",),
+                    market_events=1,
+                    trade_events=int(executed),
+                    assets=FUND_POOL,
+                    high_risk_events=int(executed or not valid),
+                    dependencies=TaskDependencyState(),
+                    safe_checkpoint=True,
+                    task_phase=task_phase,
+                    field_risk=field_risk,
+                    purpose="portfolio-allocation",
+                )
+                exposure_snapshot = dict(adaptive_controller.exposure.as_dict())
+                rotation = None
+                if decision.decision != ReplacementDecision.KEEP:
+                    new_scope, reset = adaptive_runtime.rotate_at_checkpoint(
+                        scope,
+                        {
+                            "date": str(date),
+                            "portfolio_value": portfolio.value,
+                            "last_action_valid": valid,
+                        },
+                        trading_day=datetime.strptime(str(date), "%Y%m%d").strftime(
+                            "%Y-%m-%d"
+                        ),
+                    )
+                    finscope_scope = new_scope
+                    scope_start_day = day_index + 1
+                    rotation = {
+                        "old_scope_id": reset.old_scope_id,
+                        "new_scope_id": reset.new_scope_id,
+                    }
+                adaptive_metrics = {
+                    "threshold_T": adaptive_controller.threshold,
+                    "risk": {
+                        "reid_at_1": decision.risk.reid_at_1,
+                        "link_auc": decision.risk.link_auc,
+                        "combined": decision.risk.combined,
+                    },
+                    "decision": decision.decision.value,
+                    "reason": decision.reason,
+                    "task_phase": task_phase,
+                    "field_risk": field_risk,
+                    "exposure_state": exposure_snapshot,
+                    "rotation": rotation,
+                    "estimator_fitted": adaptive_controller.estimator.fitted,
+                }
             postprocess_ms = (time.perf_counter() - post_started) * 1000
             values[method].append(portfolio.value)
             records.append(
@@ -1521,10 +1632,10 @@ def run(args: argparse.Namespace) -> Dict[str, Any]:
                         }
                         for asset, alias in representation.items()
                     ],
+                    disclosure_level=selected_level if method == "finscope" else None,
+                    adaptive=adaptive_metrics,
                 )
             )
-            if scope is not None:
-                privacy_agent.close_scope(scope)
             print(
                 f"[{day_index:02d}/{len(dates):02d}] {date} {method}: "
                 f"valid={valid} executed={executed} value={portfolio.value:.2f}",
@@ -1540,6 +1651,9 @@ def run(args: argparse.Namespace) -> Dict[str, Any]:
             records,
         )
 
+    if finscope_scope is not None:
+        privacy_agent.close_scope(finscope_scope)
+
     table = summarize(
         args.methods, records, values, portfolios, representations
     )
@@ -1553,6 +1667,8 @@ def run(args: argparse.Namespace) -> Dict[str, Any]:
             "finscope_commit": FINSCOPE_COMMIT,
             "finscope_source_dirty": FINSCOPE_SOURCE_DIRTY,
             "finscope_disclosure_level": args.disclosure_level,
+            "finscope_adaptive_threshold": args.adaptive_threshold,
+            "finscope_adaptive_calibration": args.adaptive_calibration,
             "finscope_disclosure_planner": (
                 "model-assisted-security-master-validated"
                 if privacy_bundle is not None

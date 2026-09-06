@@ -12,6 +12,8 @@ NLPCC_ROOT=${NLPCC_ROOT:-/home/zgx/data/nlpcc2026_20260818}
 TASK_MODEL=${TASK_MODEL:-/home/zgx/models/Qwen3.8-27B}
 PRIVACY_BASE_URL=${PRIVACY_BASE_URL:-http://127.0.0.1:8112/v1}
 PRIVACY_MODEL=${PRIVACY_MODEL:-Qwen2.5-3B-Instruct}
+ADAPTIVE_THRESHOLD=${ADAPTIVE_THRESHOLD:-${FINSCOPE_ADAPTIVE_T:-0.60}}
+ADAPTIVE_CALIBRATION=${ADAPTIVE_CALIBRATION:-${FINSCOPE_ADAPTIVE_CALIBRATION:-}}
 
 mkdir -p "$RUN_ROOT" "$OUTPUT_ROOT"
 
@@ -54,6 +56,8 @@ run_method() {
     --model-base-url "http://127.0.0.1:810${gpu}/v1" \
     --privacy-model-base-url "$PRIVACY_BASE_URL" \
     --privacy-model-name "$PRIVACY_MODEL" \
+    --adaptive-threshold "$ADAPTIVE_THRESHOLD" \
+    ${ADAPTIVE_CALIBRATION:+--adaptive-calibration "$ADAPTIVE_CALIBRATION"} \
     --max-new-tokens 128 \
     --methods "$method" \
     --output "$output" \

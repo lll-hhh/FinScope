@@ -116,6 +116,26 @@ class RealNlpccRunnerTests(unittest.TestCase):
         )
         self.agent.close_scope(second_scope)
 
+    def test_existing_scope_keeps_handles_across_days(self) -> None:
+        first, scope, _, _ = prepare_outbound(
+            "finscope", payload(), 20250102, self.agent, self.fixed, "P3"
+        )
+        second, repeated_scope, _, _ = prepare_outbound(
+            "finscope",
+            payload(),
+            20250103,
+            self.agent,
+            self.fixed,
+            "P3",
+            existing_scope=scope,
+        )
+        self.assertEqual(scope.id, repeated_scope.id)
+        self.assertEqual(
+            first["candidate_pool"][0]["asset"],
+            second["candidate_pool"][0]["asset"],
+        )
+        self.agent.close_scope(scope)
+
     def test_episode_aliases_are_stable_within_day_and_rotate_across_days(self) -> None:
         first = build_episode_aliases(20250102)
         repeated = build_episode_aliases(20250102)
