@@ -12,7 +12,9 @@ from benchmarks.llm_privacy_attacker import (
     LlmPrivacyAttacker,
     average_precision,
     public_batch,
+    stratified_bootstrap_interval,
     tpr_at_fpr,
+    wilson_interval,
 )
 
 
@@ -41,6 +43,11 @@ class LlmPrivacyAttackerTests(unittest.TestCase):
         scores = [0.5, 0.5, 0.5, 0.5]
         self.assertEqual(average_precision(labels, scores), 0.5)
         self.assertEqual(tpr_at_fpr(labels, scores), 0.0)
+        self.assertEqual(stratified_bootstrap_interval(labels, scores, average_precision), [0.5, 0.5])
+        interval = wilson_interval(5, 10)
+        self.assertIsNotNone(interval)
+        self.assertLess(interval[0], 0.5)
+        self.assertGreater(interval[1], 0.5)
 
     def test_scores_validated_identity_and_link_predictions(self):
         identity = json.dumps(

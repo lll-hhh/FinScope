@@ -19,7 +19,7 @@ ATTACK_COMMON=(
   --attacker-base-url "$PRIVACY_URL"
   --attacker-model "$PRIVACY_MODEL"
   --max-identity-targets 40
-  --max-link-pairs 80
+  --max-link-pairs 200
 )
 mkdir -p "$PIPELINE_ROOT"
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 import json
 import math
+import random
 import re
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
@@ -124,6 +125,52 @@ def tpr_at_fpr(
             best = max(best, true_positives)
         index = end
     return best / positives
+
+
+def wilson_interval(successes: int, total: int, z: float = 1.96) -> Optional[List[float]]:
+    if total <= 0:
+        return None
+    probability = successes / total
+    denominator = 1.0 + z * z / total
+    centre = (probability + z * z / (2.0 * total)) / denominator
+    margin = (
+        z
+        * math.sqrt(
+            probability * (1.0 - probability) / total + z * z / (4.0 * total * total)
+        )
+        / denominator
+    )
+    return [max(0.0, centre - margin), min(1.0, centre + margin)]
+
+
+def stratified_bootstrap_interval(
+    labels: Sequence[bool],
+    scores: Sequence[float],
+    metric: Any,
+    *,
+    iterations: int = 1000,
+    seed: int = 20260906,
+) -> Optional[List[float]]:
+    positive_scores = [score for label, score in zip(labels, scores) if label]
+    negative_scores = [score for label, score in zip(labels, scores) if not label]
+    if not positive_scores or not negative_scores:
+        return None
+    rng = random.Random(seed)
+    values = []
+    for _ in range(iterations):
+        sampled_positive = [rng.choice(positive_scores) for _ in positive_scores]
+        sampled_negative = [rng.choice(negative_scores) for _ in negative_scores]
+        sampled_scores = sampled_positive + sampled_negative
+        sampled_labels = [True] * len(sampled_positive) + [False] * len(sampled_negative)
+        value = metric(sampled_labels, sampled_scores)
+        if value is not None:
+            values.append(float(value))
+    if not values:
+        return None
+    values.sort()
+    lower = values[max(0, math.floor(0.025 * (len(values) - 1)))]
+    upper = values[min(len(values) - 1, math.ceil(0.975 * (len(values) - 1)))]
+    return [lower, upper]
 
 
 class LlmPrivacyAttacker:
@@ -306,6 +353,7 @@ class LlmPrivacyAttacker:
         scores: List[float] = []
         link_rows: List[Dict[str, Any]] = []
         for target in batch.link_targets:
+            model_returned = target.pair_id in link_predictions
             score = link_predictions.get(target.pair_id, 0.5)
             labels.append(target.same_entity)
             scores.append(score)
@@ -314,6 +362,7 @@ class LlmPrivacyAttacker:
                     "pair_id": target.pair_id,
                     "same_probability": score,
                     "same_entity": target.same_entity,
+                    "model_returned": model_returned,
                 }
             )
 
@@ -330,16 +379,24 @@ class LlmPrivacyAttacker:
                 else None
             ),
             "reid_at_1": sum(top1) / len(top1) if top1 else None,
+            "reid_at_1_ci95": wilson_interval(int(sum(top1)), len(top1)),
             "reid_at_5": sum(top5) / len(top5) if top5 else None,
+            "reid_at_5_ci95": wilson_interval(int(sum(top5)), len(top5)),
             "mrr": sum(reciprocal_ranks) / len(reciprocal_ranks)
             if reciprocal_ranks
             else None,
             "link_pairs": len(batch.link_targets),
             "link_coverage": (
-                len(scores) / len(batch.link_targets) if batch.link_targets else None
+                len(link_predictions) / len(batch.link_targets)
+                if batch.link_targets
+                else None
             ),
             "link_auc": roc_auc(labels, scores),
+            "link_auc_ci95": stratified_bootstrap_interval(labels, scores, roc_auc),
             "link_auprc": average_precision(labels, scores),
+            "link_auprc_ci95": stratified_bootstrap_interval(
+                labels, scores, average_precision
+            ),
             "link_tpr_at_1pct_fpr": tpr_at_fpr(labels, scores),
             "exposure_state": dict(batch.exposure_state),
             "identity_predictions": identity_rows,
