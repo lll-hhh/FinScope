@@ -10,6 +10,7 @@ STOCKBENCH_ROOT=${STOCKBENCH_ROOT:-/home/zgx/repos/stockbench-src}
 FINVAULT_ROOT=${FINVAULT_ROOT:-/home/zgx/repos/FinVault-src}
 BASE=${BASE:-/home/zgx/runlogs/finscope_qwen35_4b_20260906}
 CURRENT_FULL=${CURRENT_FULL:-$BASE/external_full}
+BASELINES_READY=${BASELINES_READY:-$CURRENT_FULL/LLM_REWRITE_RERUN_COMPLETE}
 PIPELINE_ROOT=${PIPELINE_ROOT:-$BASE/llm_attack_formal}
 PRIVACY_URL=${PRIVACY_URL:-http://127.0.0.1:18002/v1}
 PRIVACY_MODEL=${PRIVACY_MODEL:-qwen35_4b}
@@ -43,9 +44,9 @@ run_attack() {
     --prompt-audit "${output%.json}_prompt_inputs.jsonl"
 }
 
-if [[ ! -f "$CURRENT_FULL/ALL_COMPLETE" ]]; then
-  echo "waiting for isolated GPU lanes: $CURRENT_FULL/ALL_COMPLETE"
-  while [[ ! -f "$CURRENT_FULL/ALL_COMPLETE" ]]; do sleep 60; done
+if [[ ! -f "$BASELINES_READY" ]]; then
+  echo "waiting for isolated GPU lanes: $BASELINES_READY"
+  while [[ ! -f "$BASELINES_READY" ]]; do sleep 60; done
 fi
 
 DEV_ROOT="$PIPELINE_ROOT/dev_probe"
