@@ -233,7 +233,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--disclosure-level",
         choices=("P1", "P2", "P3", "P4", "P5"),
-        default="P3",
+        default="P1",
     )
     parser.add_argument(
         "--adaptive-threshold",

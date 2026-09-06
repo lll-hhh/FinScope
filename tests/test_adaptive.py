@@ -58,6 +58,38 @@ class AdaptiveControllerTests(unittest.TestCase):
         )
         self.assertEqual(checkpoint.decision, ReplacementDecision.REPLACE_NOW)
 
+    def test_disclosure_level_is_monotone_with_risk(self):
+        class StubEstimator:
+            def __init__(self):
+                self.score = 0.0
+
+            def predict(self, _state):
+                from finscope import RiskEstimate
+
+                return RiskEstimate(self.score, 0.5)
+
+        estimator = StubEstimator()
+        controller = AdaptiveReplacementController(estimator, threshold=1.0)
+        levels = []
+        for score in (0.0, 0.2, 0.45, 0.7):
+            estimator.score = score
+            levels.append(controller.choose_level())
+        self.assertEqual(
+            levels,
+            [
+                DisclosureLevel.P1,
+                DisclosureLevel.P2,
+                DisclosureLevel.P3,
+                DisclosureLevel.P4,
+            ],
+        )
+
+        controller = AdaptiveReplacementController(
+            estimator, threshold=1.0, default_level=DisclosureLevel.P3
+        )
+        estimator.score = 0.2
+        self.assertEqual(controller.choose_level(), DisclosureLevel.P3)
+
     def test_rotation_resets_exposure_without_exporting_aliases(self):
         controller = AdaptiveReplacementController(self.estimator(), threshold=0.2)
         controller.bind_scope("scope-old")

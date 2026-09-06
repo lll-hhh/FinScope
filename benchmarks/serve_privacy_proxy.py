@@ -1107,7 +1107,7 @@ def parse_args() -> argparse.Namespace:
         help="JSON prior-attack artifact used to fit the online risk estimator",
     )
     parser.add_argument("--audit-log", type=Path, required=True)
-    parser.add_argument("--disclosure-level", choices=("P1", "P2", "P3", "P4", "P5"), default="P3")
+    parser.add_argument("--disclosure-level", choices=("P1", "P2", "P3", "P4", "P5"), default="P1")
     parser.add_argument("--seed", default="finscope-external-benchmark-v1")
     parser.add_argument("--timeout", type=float, default=600.0)
     parser.add_argument("--host", default="127.0.0.1")

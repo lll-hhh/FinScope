@@ -294,7 +294,7 @@ class AdaptiveReplacementController:
         estimator: RiskEstimator,
         *,
         threshold: float,
-        default_level: Union[DisclosureLevel, str, int] = DisclosureLevel.P3,
+        default_level: Union[DisclosureLevel, str, int] = DisclosureLevel.P1,
     ) -> None:
         if not 0.0 <= float(threshold) <= 1.0:
             raise ValueError("threshold must be in [0, 1]")
@@ -323,12 +323,17 @@ class AdaptiveReplacementController:
         if task_phase.casefold() in {"execution", "trade", "order"} or field_risk >= 4:
             return DisclosureLevel.P5
         if field_risk >= 3 or score >= 0.70:
-            return DisclosureLevel.P4
-        if field_risk >= 2 or score >= 0.45:
-            return DisclosureLevel.P3
-        if score >= 0.20:
-            return DisclosureLevel.P2
-        return self.default_level
+            selected = DisclosureLevel.P4
+        elif field_risk >= 2 or score >= 0.45:
+            selected = DisclosureLevel.P3
+        elif score >= 0.20:
+            selected = DisclosureLevel.P2
+        else:
+            selected = DisclosureLevel.P1
+        # ``default_level`` is a caller-selected protection floor.  Taking
+        # the maximum preserves monotonicity even when deployments choose a
+        # stricter floor than P1.
+        return max(self.default_level, selected)
 
     def observe_call(
         self,

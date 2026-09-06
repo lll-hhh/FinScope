@@ -13,6 +13,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--attack", type=Path, required=True)
     parser.add_argument("--method", default="finscope")
+    parser.add_argument(
+        "--prior-level",
+        default="K4",
+        help="public-prior level used for conservative online risk fitting (default: K4)",
+    )
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
 
@@ -22,7 +27,11 @@ def main() -> None:
     for source_row in source_rows:
         if not isinstance(source_row, Mapping):
             continue
-        if source_row.get("status") != "ok" or source_row.get("method") != args.method:
+        if (
+            source_row.get("status") != "ok"
+            or source_row.get("method") != args.method
+            or source_row.get("prior_level") != args.prior_level
+        ):
             continue
         if not isinstance(source_row.get("exposure_state"), Mapping):
             continue
@@ -39,8 +48,9 @@ def main() -> None:
 
     result = {
         "schema_version": 1,
-        "protocol": "Qwen3.5-4B attack outcomes mapped from local exposure state",
+        "protocol": "Qwen3.5-4B strongest-public-prior attack outcomes mapped from local exposure state",
         "method_filter": args.method,
+        "prior_level_filter": args.prior_level,
         "source": str(args.attack),
         "created_at": datetime.now(timezone.utc).isoformat(),
         "rows": rows,
