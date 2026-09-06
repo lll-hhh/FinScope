@@ -52,9 +52,9 @@ fi
 
 DEV_ROOT="$PIPELINE_ROOT/dev_probe"
 if [[ ! -f "$DEV_ROOT/COMPLETE" ]]; then
-  run_stock_lane "$DEV_ROOT" global_alias 4 qwen35_4b_llm_probe 1.10 & p4=$!
-  run_stock_lane "$DEV_ROOT" episode_alias 5 qwen35_4b_llm_probe 1.10 & p5=$!
-  run_stock_lane "$DEV_ROOT" finscope 6 qwen35_4b_llm_probe 1.10 & p6=$!
+  run_stock_lane "$DEV_ROOT" global_alias 4 qwen35_4b_llm_probe 1.00 & p4=$!
+  run_stock_lane "$DEV_ROOT" episode_alias 5 qwen35_4b_llm_probe 1.00 & p5=$!
+  run_stock_lane "$DEV_ROOT" finscope 6 qwen35_4b_llm_probe 1.00 & p6=$!
   wait "$p4" "$p5" "$p6"
   date -Is > "$DEV_ROOT/COMPLETE"
 fi
