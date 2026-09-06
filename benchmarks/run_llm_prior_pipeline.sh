@@ -182,5 +182,11 @@ fi
   --output "$FULL_ROOT/nlpcc_llm_prior_attack.json" \
   --prompt-audit "$FULL_ROOT/nlpcc_llm_prior_prompt_inputs.jsonl"
 
+"$PYTHON" -m benchmarks.render_llm_attack_tables \
+  --stockbench "$STOCK_ATTACK" --finvault "$FINVAULT_ATTACK" \
+  --nlpcc "$FULL_ROOT/nlpcc_llm_prior_attack.json" \
+  --utility "$UTILITY" --calibration "$CALIBRATION" \
+  --output "$ROOT/docs/llm_privacy_attack_results.md"
+
 date -Is > "$PIPELINE_ROOT/ALL_COMPLETE"
 echo "formal LLM-attacker prior experiment and protected main-table rows complete"
