@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from functools import lru_cache
 import json
+from numbers import Real
 from pathlib import Path
 import random
 import re
@@ -77,8 +79,30 @@ def _indicator_profile(root: Path, symbol: str, day: str) -> Dict[str, float]:
         "quarterly_dividend",
     ):
         item = value.get(key)
-        if isinstance(item, (int, float)):
+        if isinstance(item, Real):
             result[key] = float(f"{float(item):.4g}")
+    return result
+
+
+@lru_cache(maxsize=10000)
+def _stock_market_day(root: str, symbol: str, day: str) -> Dict[str, float]:
+    path = Path(root) / "storage" / "parquet" / symbol / "day" / f"{day}.parquet"
+    if not path.is_file():
+        return {}
+    try:
+        import pandas as pd
+
+        frame = pd.read_parquet(path)
+    except (ImportError, OSError, ValueError):
+        return {}
+    if frame.empty:
+        return {}
+    row = frame.iloc[-1]
+    result = {}
+    for key in ("open", "high", "low", "close", "volume", "vwap"):
+        value = row.get(key)
+        if isinstance(value, Real):
+            result[key] = float(f"{float(value):.6g}")
     return result
 
 
@@ -102,6 +126,11 @@ def _candidate_profile(
         profile["public_indicators"] = {
             day: _indicator_profile(stockbench_root, entry.canonical_id, day)
             for day in _sample_days(days)
+        }
+        market_days = _sample_days(days, maximum=3 if prior == "K3" else 10)
+        profile["public_market_history"] = {
+            day: _stock_market_day(str(stockbench_root), entry.canonical_id, day)
+            for day in market_days
         }
     return profile
 
@@ -134,7 +163,7 @@ def _nlpcc_market_profiles(
             public_values = {}
             for key in ("open", "close", "pct_change"):
                 value = latest.get(key)
-                if isinstance(value, (int, float)):
+                if isinstance(value, Real):
                     public_values[key] = float(f"{float(value):.5g}")
             if public_values:
                 profiles[asset][day] = public_values
