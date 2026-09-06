@@ -7,6 +7,7 @@ EXTERNAL_ROOT=${EXTERNAL_ROOT:?EXTERNAL_ROOT is required}
 EXTERNAL_SUPERVISOR_PID=${EXTERNAL_SUPERVISOR_PID:?EXTERNAL_SUPERVISOR_PID is required}
 RUN_ROOT=${RUN_ROOT:-/home/zgx/runlogs/finscope_qwen_20260823/nlpcc_qwen38_qwen35_2b_final_v1}
 OUTPUT_ROOT=${OUTPUT_ROOT:-$FINSCOPE_ROOT/benchmarks/results/nlpcc_qwen38_qwen35_2b_final}
+MERGED_OUTPUT=${MERGED_OUTPUT:-$FINSCOPE_ROOT/benchmarks/results/nlpcc_real_2025_qwen38_qwen35_2b_final.json}
 NLPCC_ROOT=${NLPCC_ROOT:-/home/zgx/data/nlpcc2026_20260818}
 TASK_MODEL=${TASK_MODEL:-/home/zgx/models/Qwen3.8-27B}
 PRIVACY_BASE_URL=${PRIVACY_BASE_URL:-http://127.0.0.1:8112/v1}
@@ -73,6 +74,6 @@ cd "$FINSCOPE_ROOT"
   "$OUTPUT_ROOT/fixed_alias.json" \
   "$OUTPUT_ROOT/episode_alias.json" \
   "$OUTPUT_ROOT/finscope.json" \
-  --output "$FINSCOPE_ROOT/benchmarks/results/nlpcc_real_2025_qwen38_qwen35_2b_final.json" \
+  --output "$MERGED_OUTPUT" \
   >"$RUN_ROOT/merge.log" 2>&1
 date -Is >"$RUN_ROOT/ALL_COMPLETE"

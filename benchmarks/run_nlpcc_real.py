@@ -180,6 +180,7 @@ class DayRecord:
     reference_comparable_assets: int = 0
     reference_view_count: int = 0
     exact_action_restore: Optional[bool] = None
+    attacker_view: Dict[str, Any] = field(default_factory=dict)
 
 
 def parse_args() -> argparse.Namespace:
@@ -1507,6 +1508,10 @@ def run(args: argparse.Namespace) -> Dict[str, Any]:
                     reference_comparable_assets=int(continuity["comparable_assets"]),
                     reference_view_count=int(continuity["views"]),
                     exact_action_restore=exact_restore,
+                    attacker_view={
+                        "request": outbound,
+                        "response": backend_result.text,
+                    },
                 )
             )
             if scope is not None:

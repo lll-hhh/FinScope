@@ -18,7 +18,11 @@ import random
 import re
 from typing import Any, Dict, Iterable, List, Mapping, Sequence, Tuple
 
-from benchmarks.serve_privacy_proxy import stockbench_catalog
+from benchmarks.serve_privacy_proxy import (
+    AliasMapper,
+    IdentityCatalog,
+    stockbench_catalog,
+)
 
 
 PRIOR_LEVELS = ("K1", "K2", "K3", "K4")
@@ -60,6 +64,16 @@ def sort_rows(rows: Iterable[Mapping[str, Any]]) -> List[Dict[str, Any]]:
         (dict(row) for row in rows),
         key=lambda row: (day_key(row), int(row.get("request_id", 0)), str(row.get("role", ""))),
     )
+
+
+def decision_rows(rows: Iterable[Mapping[str, Any]]) -> List[Dict[str, Any]]:
+    """Keep actual trading-task requests, excluding optional report calls."""
+
+    return [
+        dict(row)
+        for row in rows
+        if str(row.get("role", "")).casefold() not in {"backtest_report", "summary_report"}
+    ]
 
 
 def normalize(value: Any) -> str:
@@ -264,16 +278,40 @@ def evaluate(args: argparse.Namespace) -> Dict[str, Any]:
     output_rows: List[Dict[str, Any]] = []
     for method in args.methods:
         source_method = method
-        rows = sort_rows(read_audit(args.audit_dir / f"stockbench_{source_method}_audit.jsonl"))
+        rows = decision_rows(
+            sort_rows(read_audit(args.audit_dir / f"stockbench_{source_method}_audit.jsonl"))
+        )
         # The external benchmark calls the fixed-lifetime baseline
         # ``global_alias``; accept ``fixed_alias`` as the table-facing name.
         if not rows and method == "fixed_alias":
             source_method = "global_alias"
-            rows = sort_rows(read_audit(args.audit_dir / "stockbench_global_alias_audit.jsonl"))
+            rows = decision_rows(
+                sort_rows(read_audit(args.audit_dir / "stockbench_global_alias_audit.jsonl"))
+            )
         if not rows:
             raise FileNotFoundError(
                 f"no successful StockBench audit rows for method {method!r} in {args.audit_dir}"
             )
+        # Older proxy logs did not persist alias bindings for the two fixed
+        # alias baselines. Reconstruct only the handles that the public
+        # attacker can observe from the documented deterministic generator;
+        # this does not read a local FinScope mapping or raw prompt.
+        if method in {"global_alias", "fixed_alias", "episode_alias"}:
+            catalog_view = IdentityCatalog(catalog_entries)
+            secret = hashlib.sha256(b"finscope-external-benchmark-v1").digest()
+            global_mapper = AliasMapper(catalog_view, "GA", secret, "global")
+            episode_mappers: Dict[str, AliasMapper] = {}
+            for row in rows:
+                if row.get("bindings"):
+                    continue
+                if method in {"global_alias", "fixed_alias"}:
+                    mapper = global_mapper
+                else:
+                    episode = str(row.get("episode_id") or day_key(row))
+                    mapper = episode_mappers.setdefault(
+                        episode, AliasMapper(catalog_view, "EA", secret, episode)
+                    )
+                row["bindings"] = mapper.bindings()
         days = sorted({day_key(row) for row in rows})
         behavior: Dict[str, List[Tuple[str, str]]] = defaultdict(list)
         for row in rows:

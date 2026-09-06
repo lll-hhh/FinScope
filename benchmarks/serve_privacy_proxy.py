@@ -337,6 +337,15 @@ def _decision_fingerprint(value: Any) -> Optional[str]:
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
+def _external_response_view(value: Mapping[str, Any]) -> Dict[str, Any]:
+    """Keep only response content that the external model provider can observe."""
+
+    return {
+        "choices": value.get("choices", []),
+        "model": value.get("model"),
+    }
+
+
 class IdentityCatalog:
     def __init__(self, entries: Sequence[CatalogEntry]) -> None:
         self.entries = tuple(entries)
@@ -994,10 +1003,15 @@ def create_app(config: ProxyConfig, entries: Sequence[CatalogEntry]):
         privacy_agent_metrics = {}
         adaptive_metrics = {}
         bindings_snapshot: List[Dict[str, str]] = []
+        # Keep the observable alias bindings for every alias baseline.  The
+        # public-prior attack is allowed to see handles and their repeated
+        # use, but never the local mapping; omitting these snapshots makes
+        # Global/Episode Alias look like a no-binding random baseline.
+        if state is not None and config.method in {"global_alias", "episode_alias", "finscope"}:
+            bindings_snapshot = controller.bindings(episode, state)
         if config.method == "finscope" and state is not None:
             agent, scope = state
             privacy_agent_metrics = agent.get_metrics(scope)
-            bindings_snapshot = controller.bindings(episode, state)
             adaptive_metrics = controller.observe_adaptive(
                 episode,
                 output=restored,
@@ -1029,6 +1043,10 @@ def create_app(config: ProxyConfig, entries: Sequence[CatalogEntry]):
                 "exact_restore": exact_restore if state is not None else None,
                 "unsafe_repair": False,
                 "bindings": bindings_snapshot,
+                "attacker_view": {
+                    "messages": outbound.get("messages", []),
+                    "response": _external_response_view(upstream),
+                },
             }
         )
         return restored

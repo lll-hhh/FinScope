@@ -12,6 +12,9 @@ PRIVACY_MODEL_BASE_URL=${PRIVACY_MODEL_BASE_URL:-http://127.0.0.1:8112/v1}
 PRIVACY_MODEL_NAME=${PRIVACY_MODEL_NAME:-Qwen2.5-3B-Instruct}
 ADAPTIVE_THRESHOLD=${ADAPTIVE_THRESHOLD:-${FINSCOPE_ADAPTIVE_T:-0.60}}
 ADAPTIVE_CALIBRATION=${ADAPTIVE_CALIBRATION:-${FINSCOPE_ADAPTIVE_CALIBRATION:-}}
+STOCKBENCH_START=${STOCKBENCH_START:-2025-03-03}
+STOCKBENCH_END=${STOCKBENCH_END:-2025-07-31}
+STOCKBENCH_RUN_SUFFIX=${STOCKBENCH_RUN_SUFFIX:-privacy_full_20250303_20250731_final}
 
 mkdir -p "$RUN_ROOT" "$FINSCOPE_ROOT/benchmarks/results"
 
@@ -30,7 +33,7 @@ health_wait() {
 run_stockbench() {
   local method=$1 gpu=$2
   local upstream_port=$((8100 + gpu)) proxy_port=$((8200 + gpu))
-  local run_id="qwen38_${method}_${PRIVACY_TAG}_privacy_full_20250303_20250731_final"
+  local run_id="qwen38_${method}_${PRIVACY_TAG}_${STOCKBENCH_RUN_SUFFIX}"
   local audit="$RUN_ROOT/stockbench_${method}_audit.jsonl"
   local proxy_log="$RUN_ROOT/stockbench_${method}_proxy.log"
   local task_log="$RUN_ROOT/stockbench_${method}.log"
@@ -60,7 +63,7 @@ run_stockbench() {
 
   cd "$STOCKBENCH_ROOT"
   "$PYTHON" -u -m stockbench.apps.run_backtest \
-    --cfg config.yaml --start 2025-03-03 --end 2025-07-31 \
+    --cfg config.yaml --start "$STOCKBENCH_START" --end "$STOCKBENCH_END" \
     --llm-profile "qwen-proxy${gpu}" --agent-mode dual --offline \
     --no-summary-llm --run-id "$run_id" >"$task_log" 2>&1
   kill -TERM "$proxy_pid" 2>/dev/null || true
