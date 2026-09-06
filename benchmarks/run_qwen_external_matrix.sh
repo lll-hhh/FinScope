@@ -20,7 +20,8 @@ mkdir -p "$RUN_ROOT" "$FINSCOPE_ROOT/benchmarks/results"
 
 health_wait() {
   local port=$1
-  for _ in $(seq 1 60); do
+  local attempts=${2:-300}
+  for _ in $(seq 1 "$attempts"); do
     if curl -fsS --max-time 2 "http://127.0.0.1:${port}/health" >/dev/null; then
       return 0
     fi
@@ -38,6 +39,10 @@ run_stockbench() {
   local proxy_log="$RUN_ROOT/stockbench_${method}_proxy.log"
   local task_log="$RUN_ROOT/stockbench_${method}.log"
   rm -f "$audit"
+
+  # A healthy privacy proxy can still mask an unavailable upstream model.
+  # Do not advance a financial trajectory while its task model is restarting.
+  health_wait "$upstream_port"
 
   local cache_mode
   cache_mode=$(cd "$STOCKBENCH_ROOT" && "$PYTHON" -c \
@@ -82,6 +87,8 @@ run_finvault() {
   local attack_output="$FINSCOPE_ROOT/benchmarks/results/finvault_qwen38_${method}_${PRIVACY_TAG}_privacy_attacks_final.json"
   local normal_output="$FINSCOPE_ROOT/benchmarks/results/finvault_qwen38_${method}_${PRIVACY_TAG}_privacy_normal_final.json"
   rm -f "$audit"
+
+  health_wait "$upstream_port"
 
   cd "$FINSCOPE_ROOT"
   "$PYTHON" -u -m benchmarks.serve_privacy_proxy \
