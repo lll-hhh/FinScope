@@ -54,7 +54,7 @@ run_attack() {
     --prompt-audit "${output%.json}_prompt_inputs.jsonl"
 }
 
-if [[ ! -f "$BASELINES_READY" ]]; then
+if [[ "$BASELINES_READY" != /dev/null && ! -f "$BASELINES_READY" ]]; then
   echo "waiting for isolated GPU lanes: $BASELINES_READY"
   while [[ ! -f "$BASELINES_READY" ]]; do sleep 60; done
 fi
@@ -76,6 +76,37 @@ RISK_ARTIFACT="$PIPELINE_ROOT/qwen35_4b_risk_estimator.json"
 "$PYTHON" -m benchmarks.build_llm_risk_artifact \
   --attack "$INITIAL_ATTACK" --method finscope --output "$RISK_ARTIFACT"
 
+baseline_dates() {
+  local audit=$1
+  rg -o '"trading_day": "[^"]+"' "$audit" | cut -d'"' -f4 | sort -u
+}
+
+llm_rewrite_baseline_is_clean() {
+  local rewrite_audit="$CURRENT_FULL/stockbench_llm_rewrite_audit.jsonl"
+  local rewrite_log="$CURRENT_FULL/stockbench_llm_rewrite.log"
+  local reference_audit="$CURRENT_FULL/stockbench_deletion_audit.jsonl"
+  [[ -s "$rewrite_audit" && -s "$rewrite_log" && -s "$reference_audit" ]] || return 1
+  ! rg -q 'HTTP error (502|503|504)|Connection (error|refused)|CUDA out of memory' \
+    "$rewrite_log" || return 1
+  diff -q <(baseline_dates "$rewrite_audit") \
+    <(baseline_dates "$reference_audit") >/dev/null
+}
+
+repair_llm_rewrite_baseline() {
+  echo "repairing incomplete StockBench LLM Rewrite baseline" >&2
+  RUN_ROOT="$CURRENT_FULL" PRIVACY_TAG=qwen35_4b_final \
+    PRIVACY_MODEL_BASE_URL="$PRIVACY_URL" PRIVACY_MODEL_NAME="$PRIVACY_MODEL" \
+    ADAPTIVE_THRESHOLD=1.00 ADAPTIVE_CALIBRATION= \
+    STOCKBENCH_START=2025-03-03 STOCKBENCH_END=2025-07-31 \
+    STOCKBENCH_RUN_SUFFIX=privacy_full_20250303_20250731_final \
+    "$ROOT/benchmarks/run_qwen_external_matrix.sh" lane 4 stockbench:llm_rewrite
+  llm_rewrite_baseline_is_clean || {
+    echo "repaired StockBench LLM Rewrite baseline failed validation" >&2
+    return 1
+  }
+  date -Is > "$CURRENT_FULL/LLM_REWRITE_RERUN_COMPLETE"
+}
+
 run_candidate() {
   local threshold=$1 gpu=$2
   local compact=${threshold/./}
@@ -87,11 +118,23 @@ run_candidate() {
   fi
 }
 
-run_candidate 0.20 4 & c20=$!
-run_candidate 0.40 5 & c40=$!
-run_candidate 0.60 6 & c60=$!
-wait "$c20" "$c40" "$c60"
-run_candidate 0.80 4
+repair_pid=
+if ! llm_rewrite_baseline_is_clean; then
+  repair_llm_rewrite_baseline > "$CURRENT_FULL/llm_rewrite_repair.log" 2>&1 &
+  repair_pid=$!
+fi
+
+# Keep GPU 4 on the long baseline repair while GPUs 5-6 scan two threshold
+# waves. This removes an otherwise serial four-hour repair from the tail.
+run_candidate 0.20 5 & c20=$!
+run_candidate 0.40 6 & c40=$!
+wait "$c20" "$c40"
+run_candidate 0.60 5 & c60=$!
+run_candidate 0.80 6 & c80=$!
+wait "$c60" "$c80"
+if [[ -n "$repair_pid" ]]; then
+  wait "$repair_pid"
+fi
 for compact in 020 040 060 080; do
   run_attack "$PIPELINE_ROOT/candidate_t${compact}" \
     "$PIPELINE_ROOT/candidate_t${compact}/llm_attack.json" --methods finscope
@@ -128,57 +171,26 @@ echo "formal LLM-attacker calibration complete: T=$T"
 
 FULL_ROOT="$PIPELINE_ROOT/exact_full"
 run_full_lane() {
-  local method=$1 gpu=$2
+  local gpu=$1
+  shift
   RUN_ROOT="$FULL_ROOT" PRIVACY_TAG=qwen35_4b_llm_final \
     PRIVACY_MODEL_BASE_URL="$PRIVACY_URL" PRIVACY_MODEL_NAME="$PRIVACY_MODEL" \
     ADAPTIVE_THRESHOLD="$T" ADAPTIVE_CALIBRATION="$CALIBRATION" \
     STOCKBENCH_START=2025-03-03 STOCKBENCH_END=2025-07-31 \
     STOCKBENCH_RUN_SUFFIX=privacy_full_llm_calibrated \
-    "$ROOT/benchmarks/run_qwen_external_matrix.sh" lane "$gpu" \
-    "stockbench:$method" "finvault:$method"
+    "$ROOT/benchmarks/run_qwen_external_matrix.sh" lane "$gpu" "$@"
 }
 
 mkdir -p "$FULL_ROOT"
 if [[ ! -f "$FULL_ROOT/TRAJECTORIES_COMPLETE" ]]; then
-  run_full_lane finscope 4 > "$FULL_ROOT/lane4.log" 2>&1 & f4=$!
-  run_full_lane episode_alias 5 > "$FULL_ROOT/lane5.log" 2>&1 & f5=$!
-  run_full_lane global_alias 6 > "$FULL_ROOT/lane6.log" 2>&1 & f6=$!
+  run_full_lane 4 stockbench:finscope finvault:finscope finvault:llm_rewrite \
+    > "$FULL_ROOT/lane4.log" 2>&1 & f4=$!
+  run_full_lane 5 stockbench:episode_alias finvault:episode_alias finvault:deletion \
+    > "$FULL_ROOT/lane5.log" 2>&1 & f5=$!
+  run_full_lane 6 stockbench:global_alias finvault:global_alias finvault:vanilla \
+    > "$FULL_ROOT/lane6.log" 2>&1 & f6=$!
   wait "$f4" "$f5" "$f6"
   date -Is > "$FULL_ROOT/TRAJECTORIES_COMPLETE"
-fi
-
-baseline_dates() {
-  local audit=$1
-  rg -o '"trading_day": "[^"]+"' "$audit" | cut -d'"' -f4 | sort -u
-}
-
-llm_rewrite_baseline_is_clean() {
-  local rewrite_audit="$CURRENT_FULL/stockbench_llm_rewrite_audit.jsonl"
-  local rewrite_log="$CURRENT_FULL/stockbench_llm_rewrite.log"
-  local reference_audit="$CURRENT_FULL/stockbench_deletion_audit.jsonl"
-  [[ -s "$rewrite_audit" && -s "$rewrite_log" && -s "$reference_audit" ]] || return 1
-  ! rg -q 'HTTP error (502|503|504)|Connection (error|refused)|CUDA out of memory' \
-    "$rewrite_log" || return 1
-  diff -q <(baseline_dates "$rewrite_audit") \
-    <(baseline_dates "$reference_audit") >/dev/null
-}
-
-# The baseline run is reused by the final summary, so infrastructure failures
-# must be repaired rather than counted as LLM Rewrite behavior. At this point
-# the calibrated protected lanes have released GPUs 4-6.
-if ! llm_rewrite_baseline_is_clean; then
-  echo "repairing incomplete StockBench LLM Rewrite baseline" >&2
-  RUN_ROOT="$CURRENT_FULL" PRIVACY_TAG=qwen35_4b_final \
-    PRIVACY_MODEL_BASE_URL="$PRIVACY_URL" PRIVACY_MODEL_NAME="$PRIVACY_MODEL" \
-    ADAPTIVE_THRESHOLD="$T" ADAPTIVE_CALIBRATION="$CALIBRATION" \
-    STOCKBENCH_START=2025-03-03 STOCKBENCH_END=2025-07-31 \
-    STOCKBENCH_RUN_SUFFIX=privacy_full_20250303_20250731_final \
-    "$ROOT/benchmarks/run_qwen_external_matrix.sh" lane 4 stockbench:llm_rewrite
-  llm_rewrite_baseline_is_clean || {
-    echo "repaired StockBench LLM Rewrite baseline failed validation" >&2
-    exit 1
-  }
-  date -Is > "$CURRENT_FULL/LLM_REWRITE_RERUN_COMPLETE"
 fi
 
 STOCK_ATTACK="$FULL_ROOT/stockbench_llm_prior_attack.json"
