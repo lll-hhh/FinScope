@@ -15,6 +15,7 @@ BASELINES_READY=${BASELINES_READY:-$CURRENT_FULL/LLM_REWRITE_RERUN_COMPLETE}
 PIPELINE_ROOT=${PIPELINE_ROOT:-$BASE/llm_attack_formal}
 PRIVACY_URL=${PRIVACY_URL:-http://127.0.0.1:18002/v1}
 PRIVACY_MODEL=${PRIVACY_MODEL:-qwen35_4b}
+SKIP_BASELINE_REPAIR=${SKIP_BASELINE_REPAIR:-0}
 ATTACK_COMMON=(
   --attacker-base-url "$PRIVACY_URL"
   --attacker-model "$PRIVACY_MODEL"
@@ -72,7 +73,7 @@ INITIAL_ATTACK="$PIPELINE_ROOT/dev_probe_llm_attack.json"
 run_attack "$DEV_ROOT" "$INITIAL_ATTACK" \
   --methods fixed_alias episode_alias finscope
 
-RISK_ARTIFACT="$PIPELINE_ROOT/qwen35_4b_risk_estimator.json"
+RISK_ARTIFACT="$PIPELINE_ROOT/qwen35_4b_empirical_risk_lookup.json"
 "$PYTHON" -m benchmarks.build_llm_risk_artifact \
   --attack "$INITIAL_ATTACK" --method finscope --output "$RISK_ARTIFACT"
 
@@ -111,6 +112,10 @@ run_candidate() {
   local threshold=$1 gpu=$2
   local compact=${threshold/./}
   local target="$PIPELINE_ROOT/candidate_t${compact}"
+  if [[ -f "$target/RUNNING" && ! -f "$target/COMPLETE" ]]; then
+    while [[ ! -f "$target/COMPLETE" ]]; do sleep 30; done
+    return 0
+  fi
   if [[ ! -f "$target/COMPLETE" ]]; then
     run_stock_lane "$target" finscope "$gpu" "qwen35_4b_llm_t${compact}" \
       "$threshold" "$RISK_ARTIFACT"
@@ -119,7 +124,7 @@ run_candidate() {
 }
 
 repair_pid=
-if ! llm_rewrite_baseline_is_clean; then
+if [[ "$SKIP_BASELINE_REPAIR" != 1 ]] && ! llm_rewrite_baseline_is_clean; then
   repair_llm_rewrite_baseline > "$CURRENT_FULL/llm_rewrite_repair.log" 2>&1 &
   repair_pid=$!
 fi

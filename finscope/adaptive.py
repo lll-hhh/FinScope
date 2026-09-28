@@ -1,9 +1,8 @@
-"""Risk-calibrated disclosure and handle rotation for long financial tasks.
+"""Empirical-risk disclosure and handle rotation for long financial tasks.
 
-The runtime deliberately keeps this controller independent from the external
-model. Attack traces are used offline to fit the estimator and calibrate a
-threshold; the online controller only sees local exposure and dependency
-state.
+Qwen attack outcomes are measured offline and stored as a deterministic
+lookup table. The online controller only performs table lookup/interpolation
+over local exposure state; it never trains or runs a risk prediction model.
 """
 
 from __future__ import annotations
@@ -11,7 +10,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
 import json
-import math
 from pathlib import Path
 from typing import Any, Iterable, List, Mapping, Optional, Sequence, Tuple, Union
 
@@ -70,7 +68,7 @@ class ExposureState:
         self.high_risk_events = 0
 
     def features(self) -> Tuple[float, ...]:
-        # Caps keep the estimator numerically stable while preserving order.
+        # Caps make heterogeneous exposure counters comparable in the lookup index.
         return (
             min(self.alias_occurrences, 100) / 100.0,
             min(self.age_days, 365) / 365.0,
@@ -147,92 +145,73 @@ class AttackObservation:
         )
 
 
-def _solve_linear_system(matrix: List[List[float]], vector: List[float]) -> List[float]:
-    """Small Gaussian solver; avoids making numpy a runtime dependency."""
+def _exposure_index(features: Sequence[float]) -> float:
+    """Equal-weight index used only to address the empirical lookup table."""
 
-    size = len(vector)
-    augmented = [matrix[i][:] + [vector[i]] for i in range(size)]
-    for column in range(size):
-        pivot = max(range(column, size), key=lambda row: abs(augmented[row][column]))
-        if abs(augmented[pivot][column]) < 1e-10:
-            augmented[column][column] = 1.0
-            continue
-        augmented[column], augmented[pivot] = augmented[pivot], augmented[column]
-        divisor = augmented[column][column]
-        augmented[column] = [value / divisor for value in augmented[column]]
-        for row in range(size):
-            if row == column:
-                continue
-            factor = augmented[row][column]
-            if factor:
-                augmented[row] = [
-                    left - factor * right
-                    for left, right in zip(augmented[row], augmented[column])
-                ]
-    return [augmented[row][-1] for row in range(size)]
+    if len(features) != len(FEATURE_NAMES):
+        raise ValueError("exposure feature vector has the wrong length")
+    return sum(max(0.0, min(1.0, float(value))) for value in features) / len(features)
 
 
-class RiskEstimator:
-    """Ridge estimator mapping local exposure features to attack outcomes."""
+class EmpiricalRiskLookup:
+    """Piecewise-linear lookup over measured K4 attack outcomes.
 
-    def __init__(self, *, ridge: float = 1e-2) -> None:
-        self.ridge = float(ridge)
-        self._reid_weights: Optional[Tuple[float, ...]] = None
-        self._link_weights: Optional[Tuple[float, ...]] = None
-        self._base = RiskEstimate(0.0, 0.5)
+    Rows are ordered by their fixed equal-weight exposure index. Repeated
+    indices are collapsed conservatively and the cumulative upper envelope is
+    used so that additional exposure cannot reduce the online risk. This is a
+    deterministic table construction, not model fitting.
+    """
+
+    def __init__(self, observations: Sequence[AttackObservation] = ()) -> None:
+        grouped: dict[float, RiskEstimate] = {}
+        for observation in observations:
+            index = _exposure_index(observation.features)
+            current = grouped.get(index, RiskEstimate(0.0, 0.5))
+            link_risk = max(
+                2.0 * abs(current.link_auc - 0.5),
+                2.0 * abs(observation.link_auc - 0.5),
+            )
+            grouped[index] = RiskEstimate(
+                max(current.reid_at_1, observation.reid_at_1),
+                0.5 + 0.5 * min(1.0, link_risk),
+            )
+        points: List[Tuple[float, RiskEstimate]] = []
+        max_reid = 0.0
+        max_link_risk = 0.0
+        for index, measured in sorted(grouped.items()):
+            max_reid = max(max_reid, measured.reid_at_1)
+            max_link_risk = max(max_link_risk, 2.0 * abs(measured.link_auc - 0.5))
+            points.append(
+                (index, RiskEstimate(max_reid, 0.5 + 0.5 * min(1.0, max_link_risk)))
+            )
+        self._points = tuple(points)
+        self.observation_count = len(observations)
 
     @property
-    def fitted(self) -> bool:
-        return self._reid_weights is not None and self._link_weights is not None
+    def ready(self) -> bool:
+        return bool(self._points)
 
-    def fit(self, observations: Sequence[AttackObservation]) -> "RiskEstimator":
-        if not observations:
-            raise ValueError("at least one attack observation is required")
-        dimension = len(FEATURE_NAMES) + 1
-        matrix = [[0.0] * dimension for _ in range(dimension)]
-        reid_target = [0.0] * dimension
-        link_target = [0.0] * dimension
-        for observation in observations:
-            row = [1.0, *observation.features]
-            for left in range(dimension):
-                for right in range(dimension):
-                    matrix[left][right] += row[left] * row[right]
-                reid_target[left] += row[left] * observation.reid_at_1
-                link_target[left] += row[left] * observation.link_auc
-        for index in range(1, dimension):
-            matrix[index][index] += self.ridge
-        self._reid_weights = tuple(_solve_linear_system(matrix, reid_target))
-        self._link_weights = tuple(_solve_linear_system(matrix, link_target))
-        self._base = RiskEstimate(
-            sum(item.reid_at_1 for item in observations) / len(observations),
-            sum(item.link_auc for item in observations) / len(observations),
-        )
-        return self
+    @property
+    def points(self) -> Tuple[Tuple[float, RiskEstimate], ...]:
+        return self._points
 
     def predict(self, state: ExposureState) -> RiskEstimate:
-        if not self.fitted:
-            # A run may start before the offline public-prior attack has been
-            # calibrated.  Keep the controller usable, but make this fallback
-            # deliberately monotone and conservative; formal results must use
-            # a fitted estimator loaded from the attack trace.
-            values = state.features()
-            score = min(
-                1.0,
-                0.02
-                + 0.26 * values[0]
-                + 0.14 * values[1]
-                + 0.14 * values[2]
-                + 0.16 * values[3]
-                + 0.18 * values[4]
-                + 0.08 * values[5]
-                + 0.24 * values[6],
-            )
-            return RiskEstimate(score, min(1.0, 0.5 + 0.5 * score))
-        row = (1.0, *state.features())
-        assert self._reid_weights is not None and self._link_weights is not None
-        reid = sum(weight * value for weight, value in zip(self._reid_weights, row))
-        link = sum(weight * value for weight, value in zip(self._link_weights, row))
-        return RiskEstimate(max(0.0, min(1.0, reid)), max(0.0, min(1.0, link)))
+        if not self._points:
+            return RiskEstimate(0.0, 0.5)
+        target = _exposure_index(state.features())
+        left_index = 0.0
+        left = RiskEstimate(0.0, 0.5)
+        for right_index, right in self._points:
+            if target <= right_index:
+                width = right_index - left_index
+                ratio = 1.0 if width <= 1e-12 else (target - left_index) / width
+                ratio = max(0.0, min(1.0, ratio))
+                return RiskEstimate(
+                    left.reid_at_1 + ratio * (right.reid_at_1 - left.reid_at_1),
+                    left.link_auc + ratio * (right.link_auc - left.link_auc),
+                )
+            left_index, left = right_index, right
+        return left
 
 
 @dataclass(frozen=True)
@@ -241,6 +220,7 @@ class DevPolicyResult:
     utility_loss: float
     reid_at_1: float
     link_auc: float
+    eligible: bool = True
 
     @property
     def privacy_risk(self) -> float:
@@ -256,7 +236,10 @@ def calibrate_threshold(
 
     if not results:
         raise ValueError("development policy results are required")
-    eligible = [item for item in results if item.utility_loss <= max_utility_loss]
+    eligible = [
+        item for item in results
+        if item.eligible and item.utility_loss <= max_utility_loss
+    ]
     if not eligible:
         raise ValueError("no threshold satisfies the utility constraint")
     selected = min(eligible, key=lambda item: (item.privacy_risk, item.threshold))
@@ -291,14 +274,14 @@ class AdaptiveReplacementController:
 
     def __init__(
         self,
-        estimator: RiskEstimator,
+        risk_lookup: EmpiricalRiskLookup,
         *,
         threshold: float,
         default_level: Union[DisclosureLevel, str, int] = DisclosureLevel.P1,
     ) -> None:
         if not 0.0 <= float(threshold) <= 1.0:
             raise ValueError("threshold must be in [0, 1]")
-        self.estimator = estimator
+        self.risk_lookup = risk_lookup
         self.threshold = float(threshold)
         self.default_level = DisclosureLevel.parse(default_level)
         self.exposure = ExposureState()
@@ -316,7 +299,7 @@ class AdaptiveReplacementController:
         task_phase: str = "analysis",
         field_risk: int = 1,
     ) -> DisclosureLevel:
-        estimate = self.estimator.predict(self.exposure)
+        estimate = self.risk_lookup.predict(self.exposure)
         score = estimate.combined
         # P5 is strongest protection. Execution and high-risk fields override
         # a low cumulative score.
@@ -362,7 +345,7 @@ class AdaptiveReplacementController:
         )
         if dependencies is not None:
             self.dependencies = dependencies
-        risk = self.estimator.predict(self.exposure)
+        risk = self.risk_lookup.predict(self.exposure)
         level = self.choose_level(purpose=purpose, task_phase=task_phase, field_risk=field_risk)
         if risk.combined < self.threshold:
             return AdaptiveDecision(ReplacementDecision.KEEP, level, risk, "risk_below_T")
@@ -474,20 +457,25 @@ class AdaptiveRuntime:
             raise
 
 
-def fit_risk_estimator(rows: Sequence[Mapping[str, Any]]) -> RiskEstimator:
-    """Fit directly from JSON-like attack rows produced by an offline runner."""
+def build_empirical_risk_lookup(
+    rows: Sequence[Mapping[str, Any]],
+) -> EmpiricalRiskLookup:
+    """Build a deterministic lookup from measured attack rows."""
 
-    estimator = RiskEstimator()
-    estimator.fit([AttackObservation.from_mapping(row) for row in rows])
-    return estimator
+    observations = [AttackObservation.from_mapping(row) for row in rows]
+    if not observations:
+        raise ValueError("at least one attack observation is required")
+    return EmpiricalRiskLookup(observations)
 
 
-def load_risk_estimator(path: Union[str, Path]) -> RiskEstimator:
-    """Load the estimator training rows from a prior-attack JSON artifact."""
+def load_empirical_risk_lookup(path: Union[str, Path]) -> EmpiricalRiskLookup:
+    """Load measured K4 rows from an empirical calibration artifact."""
 
     source = Path(path)
     payload = json.loads(source.read_text(encoding="utf-8"))
     rows = payload.get("rows", payload) if isinstance(payload, Mapping) else payload
     if not isinstance(rows, Sequence) or isinstance(rows, (str, bytes, bytearray)):
         raise ValueError("calibration artifact must contain a JSON row list")
-    return fit_risk_estimator([row for row in rows if isinstance(row, Mapping)])
+    return build_empirical_risk_lookup(
+        [row for row in rows if isinstance(row, Mapping)]
+    )

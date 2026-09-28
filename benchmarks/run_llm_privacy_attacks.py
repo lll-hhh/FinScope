@@ -28,7 +28,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--trace-lengths", nargs="+", type=int, default=[1, 5, 20, 0])
     parser.add_argument("--attacker-base-url", default="http://127.0.0.1:18002/v1")
     parser.add_argument("--attacker-model", default="qwen35_4b")
-    parser.add_argument("--max-tokens", type=int, default=3072)
+    parser.add_argument("--max-tokens", type=int, default=1536)
     parser.add_argument("--max-identity-targets", type=int, default=40)
     parser.add_argument("--max-link-pairs", type=int, default=80)
     parser.add_argument("--max-candidates", type=int, default=100)

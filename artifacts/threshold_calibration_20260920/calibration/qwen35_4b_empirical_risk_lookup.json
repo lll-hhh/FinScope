@@ -1,0 +1,4747 @@
+{
+  "schema_version": 2,
+  "type": "empirical_lookup",
+  "protocol": "Qwen3.5-4B zero-shot K4 attack outcomes indexed by local exposure state; no trained risk model",
+  "method_filter": "finscope",
+  "prior_level_filter": "K4",
+  "source": "/home/zgx/runlogs/finscope_qwen35_4b_20260906/llm_attack_formal_20260920/dev_probe_llm_attack.json",
+  "created_at": "2026-09-21T12:37:46.211571+00:00",
+  "lookup_rule": {
+    "exposure_index": "equal mean of the seven capped local exposure features",
+    "interpolation": "piecewise linear",
+    "monotonicity": "cumulative upper envelope of measured ReID and linkage risk"
+  },
+  "rows": [
+    {
+      "benchmark": "StockBench",
+      "method": "finscope",
+      "prior_level": "K4",
+      "trace_length": "1",
+      "candidate_count": 20,
+      "identity_targets": 20,
+      "identity_coverage": 1.0,
+      "reid_at_1": 0.4,
+      "reid_at_1_ci95": [
+        0.21880396741419272,
+        0.613422057684794
+      ],
+      "reid_at_5": 0.8,
+      "reid_at_5_ci95": [
+        0.5839782779742401,
+        0.9193436467288
+      ],
+      "mrr": 0.5458333333333334,
+      "link_pairs": 0,
+      "link_coverage": null,
+      "link_auc": 0.5,
+      "link_auc_ci95": null,
+      "link_auprc": null,
+      "link_auprc_ci95": null,
+      "link_tpr_at_1pct_fpr": null,
+      "exposure_state": {
+        "alias_occurrences": 550,
+        "age_days": 0,
+        "visible_roles": [
+          "decision_agent",
+          "fundamental_filter"
+        ],
+        "market_events": 2,
+        "trade_events": 0,
+        "distinct_assets": [
+          "AAPL",
+          "AMGN",
+          "AMZN",
+          "AXP",
+          "BA",
+          "CAT",
+          "CRM",
+          "GS",
+          "HD",
+          "HON",
+          "IBM",
+          "JNJ",
+          "JPM",
+          "MCD",
+          "MSFT",
+          "PG",
+          "SHW",
+          "TRV",
+          "UNH",
+          "V"
+        ],
+        "high_risk_events": 1
+      },
+      "identity_predictions": [
+        {
+          "target_id": "target-0001",
+          "ranking": [
+            "GS",
+            "V",
+            "AXP",
+            "JPM",
+            "TRV"
+          ],
+          "confidence": 0.92,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0002",
+          "ranking": [
+            "JPM",
+            "GS",
+            "V",
+            "AXP",
+            "TRV"
+          ],
+          "confidence": 0.88,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0003",
+          "ranking": [
+            "AMZN",
+            "AAPL",
+            "MSFT",
+            "CRM",
+            "IBM"
+          ],
+          "confidence": 0.85,
+          "hit_at_1": false,
+          "hit_at_5": false,
+          "rank": null
+        },
+        {
+          "target_id": "target-0004",
+          "ranking": [
+            "PG",
+            "HD",
+            "MCD",
+            "AMZN",
+            "AAPL"
+          ],
+          "confidence": 0.8,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0005",
+          "ranking": [
+            "MSFT",
+            "CRM",
+            "IBM",
+            "AMZN",
+            "AAPL"
+          ],
+          "confidence": 0.87,
+          "hit_at_1": false,
+          "hit_at_5": true,
+          "rank": 2
+        },
+        {
+          "target_id": "target-0006",
+          "ranking": [
+            "BA",
+            "HON",
+            "CAT",
+            "SHW"
+          ],
+          "confidence": 0.83,
+          "hit_at_1": false,
+          "hit_at_5": true,
+          "rank": 3
+        },
+        {
+          "target_id": "target-0007",
+          "ranking": [
+            "HD",
+            "MCD",
+            "PG",
+            "AMZN",
+            "AAPL"
+          ],
+          "confidence": 0.81,
+          "hit_at_1": false,
+          "hit_at_5": true,
+          "rank": 4
+        },
+        {
+          "target_id": "target-0008",
+          "ranking": [
+            "UNH",
+            "AMGN",
+            "JNJ",
+            "BA",
+            "HON"
+          ],
+          "confidence": 0.86,
+          "hit_at_1": false,
+          "hit_at_5": false,
+          "rank": null
+        },
+        {
+          "target_id": "target-0009",
+          "ranking": [
+            "MSFT",
+            "CRM",
+            "IBM",
+            "AMZN",
+            "AAPL"
+          ],
+          "confidence": 0.84,
+          "hit_at_1": false,
+          "hit_at_5": true,
+          "rank": 3
+        },
+        {
+          "target_id": "target-0010",
+          "ranking": [
+            "GS",
+            "V",
+            "AXP",
+            "JPM",
+            "TRV"
+          ],
+          "confidence": 0.9,
+          "hit_at_1": false,
+          "hit_at_5": false,
+          "rank": null
+        },
+        {
+          "target_id": "target-0011",
+          "ranking": [
+            "TRV",
+            "GS",
+            "V",
+            "AXP",
+            "JPM"
+          ],
+          "confidence": 0.89,
+          "hit_at_1": false,
+          "hit_at_5": true,
+          "rank": 3
+        },
+        {
+          "target_id": "target-0012",
+          "ranking": [
+            "HD",
+            "MCD",
+            "PG",
+            "AMZN",
+            "AAPL"
+          ],
+          "confidence": 0.79,
+          "hit_at_1": false,
+          "hit_at_5": false,
+          "rank": null
+        },
+        {
+          "target_id": "target-0013",
+          "ranking": [
+            "BA",
+            "HON",
+            "CAT",
+            "SHW"
+          ],
+          "confidence": 0.82,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0014",
+          "ranking": [
+            "HD",
+            "MCD",
+            "PG",
+            "AMZN",
+            "AAPL"
+          ],
+          "confidence": 0.8,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0015",
+          "ranking": [
+            "UNH",
+            "AMGN",
+            "JNJ",
+            "BA",
+            "HON"
+          ],
+          "confidence": 0.85,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0016",
+          "ranking": [
+            "AMGN",
+            "UNH",
+            "JNJ",
+            "BA",
+            "HON"
+          ],
+          "confidence": 0.84,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0017",
+          "ranking": [
+            "GS",
+            "V",
+            "AXP",
+            "JPM",
+            "TRV"
+          ],
+          "confidence": 0.91,
+          "hit_at_1": false,
+          "hit_at_5": true,
+          "rank": 3
+        },
+        {
+          "target_id": "target-0018",
+          "ranking": [
+            "MSFT",
+            "CRM",
+            "IBM",
+            "AMZN",
+            "AAPL"
+          ],
+          "confidence": 0.86,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0019",
+          "ranking": [
+            "BA",
+            "HON",
+            "CAT",
+            "SHW"
+          ],
+          "confidence": 0.81,
+          "hit_at_1": false,
+          "hit_at_5": true,
+          "rank": 2
+        },
+        {
+          "target_id": "target-0020",
+          "ranking": [
+            "UNH",
+            "AMGN",
+            "JNJ",
+            "BA",
+            "HON"
+          ],
+          "confidence": 0.83,
+          "hit_at_1": false,
+          "hit_at_5": true,
+          "rank": 3
+        }
+      ],
+      "link_predictions": [],
+      "status": "ok",
+      "link_auc_imputed_for_lookup": true
+    },
+    {
+      "benchmark": "StockBench",
+      "method": "finscope",
+      "prior_level": "K4",
+      "trace_length": "5",
+      "candidate_count": 20,
+      "identity_targets": 20,
+      "identity_coverage": 1.0,
+      "reid_at_1": 0.95,
+      "reid_at_1_ci95": [
+        0.7638641064874331,
+        0.9911187805671268
+      ],
+      "reid_at_5": 1.0,
+      "reid_at_5_ci95": [
+        0.8388698745050667,
+        1.0
+      ],
+      "mrr": 0.9666666666666668,
+      "link_pairs": 160,
+      "link_coverage": 1.0,
+      "link_auc": 0.926640625,
+      "link_auc_ci95": [
+        0.881171875,
+        0.966015625
+      ],
+      "link_auprc": 0.8807907658437639,
+      "link_auprc_ci95": [
+        0.8185905851462865,
+        0.9424029813092314
+      ],
+      "link_tpr_at_1pct_fpr": 0.0,
+      "exposure_state": {
+        "alias_occurrences": 3392,
+        "age_days": 4,
+        "visible_roles": [
+          "decision_agent",
+          "fundamental_filter"
+        ],
+        "market_events": 10,
+        "trade_events": 0,
+        "distinct_assets": [
+          "AAPL",
+          "AMGN",
+          "AMZN",
+          "AXP",
+          "BA",
+          "CAT",
+          "CRM",
+          "GS",
+          "HD",
+          "HON",
+          "IBM",
+          "JNJ",
+          "JPM",
+          "MCD",
+          "MSFT",
+          "PG",
+          "SHW",
+          "TRV",
+          "UNH",
+          "V"
+        ],
+        "high_risk_events": 5
+      },
+      "identity_predictions": [
+        {
+          "target_id": "target-0001",
+          "ranking": [
+            "GS",
+            "V",
+            "AXP",
+            "JPM",
+            "TRV"
+          ],
+          "confidence": 0.92,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0002",
+          "ranking": [
+            "JPM",
+            "GS",
+            "V",
+            "AXP",
+            "TRV"
+          ],
+          "confidence": 0.88,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0003",
+          "ranking": [
+            "MCD",
+            "PG",
+            "AMZN",
+            "HD",
+            "CRM"
+          ],
+          "confidence": 0.85,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0004",
+          "ranking": [
+            "PG",
+            "HD",
+            "MCD",
+            "AMZN",
+            "CRM"
+          ],
+          "confidence": 0.82,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0005",
+          "ranking": [
+            "CRM",
+            "MSFT",
+            "IBM",
+            "AAPL",
+            "MCD"
+          ],
+          "confidence": 0.89,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0006",
+          "ranking": [
+            "CAT",
+            "HON",
+            "BA",
+            "IBM",
+            "MSFT"
+          ],
+          "confidence": 0.87,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0007",
+          "ranking": [
+            "AMZN",
+            "HD",
+            "MCD",
+            "PG",
+            "CRM"
+          ],
+          "confidence": 0.84,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0008",
+          "ranking": [
+            "SHW",
+            "HON",
+            "BA",
+            "CAT",
+            "IBM"
+          ],
+          "confidence": 0.86,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0009",
+          "ranking": [
+            "IBM",
+            "CRM",
+            "AAPL",
+            "MSFT",
+            "AMZN"
+          ],
+          "confidence": 0.85,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0010",
+          "ranking": [
+            "IBM",
+            "CRM",
+            "AAPL",
+            "MSFT",
+            "AMZN"
+          ],
+          "confidence": 0.82,
+          "hit_at_1": false,
+          "hit_at_5": true,
+          "rank": 3
+        },
+        {
+          "target_id": "target-0011",
+          "ranking": [
+            "V",
+            "JPM",
+            "AXP",
+            "TRV",
+            "GS"
+          ],
+          "confidence": 0.88,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0012",
+          "ranking": [
+            "TRV",
+            "GS",
+            "V",
+            "AXP",
+            "JPM"
+          ],
+          "confidence": 0.84,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0013",
+          "ranking": [
+            "BA",
+            "HON",
+            "CAT",
+            "HD",
+            "MCD"
+          ],
+          "confidence": 0.86,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0014",
+          "ranking": [
+            "HD",
+            "MCD",
+            "PG",
+            "AMZN",
+            "CRM"
+          ],
+          "confidence": 0.83,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0015",
+          "ranking": [
+            "UNH",
+            "AMGN",
+            "JNJ",
+            "IBM",
+            "AAPL"
+          ],
+          "confidence": 0.87,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0016",
+          "ranking": [
+            "AMGN",
+            "UNH",
+            "JNJ",
+            "IBM",
+            "AAPL"
+          ],
+          "confidence": 0.85,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0017",
+          "ranking": [
+            "AXP",
+            "V",
+            "TRV",
+            "JPM",
+            "GS"
+          ],
+          "confidence": 0.85,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0018",
+          "ranking": [
+            "MSFT",
+            "CRM",
+            "IBM",
+            "AMZN",
+            "AAPL"
+          ],
+          "confidence": 0.82,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0019",
+          "ranking": [
+            "HON",
+            "BA",
+            "CAT",
+            "HD",
+            "MCD"
+          ],
+          "confidence": 0.78,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0020",
+          "ranking": [
+            "JNJ",
+            "UNH",
+            "AMGN",
+            "PG",
+            "SHW"
+          ],
+          "confidence": 0.8,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        }
+      ],
+      "link_predictions": [
+        {
+          "pair_id": "pair-0001",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0002",
+          "same_probability": 0.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0003",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0004",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0005",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0006",
+          "same_probability": 1.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0007",
+          "same_probability": 1.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0008",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0009",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0010",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0011",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0012",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0013",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0014",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0015",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0016",
+          "same_probability": 0.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0017",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0018",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0019",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0020",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0021",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0022",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0023",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0024",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0025",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0026",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0027",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0028",
+          "same_probability": 1.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0029",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0030",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0031",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0032",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0033",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0034",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0035",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0036",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0037",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0038",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0039",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0040",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0041",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0042",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0043",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0044",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0045",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0046",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0047",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0048",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0049",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0050",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0051",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0052",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0053",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0054",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0055",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0056",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0057",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0058",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0059",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0060",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0061",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0062",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0063",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0064",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0065",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0066",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0067",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0068",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0069",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0070",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0071",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0072",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0073",
+          "same_probability": 1.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0074",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0075",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0076",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0077",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0078",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0079",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0080",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0081",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0082",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0083",
+          "same_probability": 1.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0084",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0085",
+          "same_probability": 0.05,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0086",
+          "same_probability": 0.98,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0087",
+          "same_probability": 0.12,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0088",
+          "same_probability": 0.08,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0089",
+          "same_probability": 0.99,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0090",
+          "same_probability": 0.03,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0091",
+          "same_probability": 0.98,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0092",
+          "same_probability": 0.04,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0093",
+          "same_probability": 0.99,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0094",
+          "same_probability": 0.02,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0095",
+          "same_probability": 0.99,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0096",
+          "same_probability": 0.03,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0097",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0098",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0099",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0100",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0101",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0102",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0103",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0104",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0105",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0106",
+          "same_probability": 1.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0107",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0108",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0109",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0110",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0111",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0112",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0113",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0114",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0115",
+          "same_probability": 1.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0116",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0117",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0118",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0119",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0120",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0121",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0122",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0123",
+          "same_probability": 1.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0124",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0125",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0126",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0127",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0128",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0129",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0130",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0131",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0132",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0133",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0134",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0135",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0136",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0137",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0138",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0139",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0140",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0141",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0142",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0143",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0144",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0145",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0146",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0147",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0148",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0149",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0150",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0151",
+          "same_probability": 1.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0152",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0153",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0154",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0155",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0156",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0157",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0158",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0159",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0160",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        }
+      ],
+      "status": "ok"
+    },
+    {
+      "benchmark": "StockBench",
+      "method": "finscope",
+      "prior_level": "K4",
+      "trace_length": "20",
+      "candidate_count": 20,
+      "identity_targets": 20,
+      "identity_coverage": 1.0,
+      "reid_at_1": 0.85,
+      "reid_at_1_ci95": [
+        0.6395767041130426,
+        0.9476322080405041
+      ],
+      "reid_at_5": 0.95,
+      "reid_at_5_ci95": [
+        0.7638641064874331,
+        0.9911187805671268
+      ],
+      "mrr": 0.885,
+      "link_pairs": 200,
+      "link_coverage": 1.0,
+      "link_auc": 0.97485,
+      "link_auc_ci95": [
+        0.95,
+        0.995
+      ],
+      "link_auprc": 0.9606029702970297,
+      "link_auprc_ci95": [
+        0.9234239482200648,
+        0.9900990099009901
+      ],
+      "link_tpr_at_1pct_fpr": 0.0,
+      "exposure_state": {
+        "alias_occurrences": 17814,
+        "age_days": 19,
+        "visible_roles": [
+          "decision_agent",
+          "fundamental_filter"
+        ],
+        "market_events": 43,
+        "trade_events": 0,
+        "distinct_assets": [
+          "AAPL",
+          "AMGN",
+          "AMZN",
+          "AXP",
+          "BA",
+          "CAT",
+          "CRM",
+          "GS",
+          "HD",
+          "HON",
+          "IBM",
+          "JNJ",
+          "JPM",
+          "MCD",
+          "MSFT",
+          "PG",
+          "SHW",
+          "TRV",
+          "UNH",
+          "V"
+        ],
+        "high_risk_events": 23
+      },
+      "identity_predictions": [
+        {
+          "target_id": "target-0001",
+          "ranking": [
+            "JPM",
+            "V",
+            "AXP",
+            "TRV",
+            "GS"
+          ],
+          "confidence": 0.87,
+          "hit_at_1": false,
+          "hit_at_5": true,
+          "rank": 5
+        },
+        {
+          "target_id": "target-0002",
+          "ranking": [
+            "JPM",
+            "V",
+            "AXP",
+            "TRV",
+            "GS"
+          ],
+          "confidence": 0.85,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0003",
+          "ranking": [
+            "MCD",
+            "PG",
+            "HD",
+            "AMZN",
+            "CRM"
+          ],
+          "confidence": 0.85,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0004",
+          "ranking": [
+            "PG",
+            "HD",
+            "AMZN",
+            "MCD",
+            "CRM"
+          ],
+          "confidence": 0.82,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0005",
+          "ranking": [
+            "CRM",
+            "MSFT",
+            "AMZN",
+            "AAPL",
+            "IBM"
+          ],
+          "confidence": 0.82,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0006",
+          "ranking": [
+            "CAT",
+            "HON",
+            "BA",
+            "SHW",
+            "IBM"
+          ],
+          "confidence": 0.79,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0007",
+          "ranking": [
+            "AMZN",
+            "PG",
+            "MCD",
+            "CRM",
+            "HD"
+          ],
+          "confidence": 0.85,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0008",
+          "ranking": [
+            "SHW",
+            "HON",
+            "HD",
+            "PG",
+            "MCD"
+          ],
+          "confidence": 0.72,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0009",
+          "ranking": [
+            "IBM",
+            "CRM",
+            "AAPL",
+            "AMZN",
+            "MSFT"
+          ],
+          "confidence": 0.85,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0010",
+          "ranking": [
+            "AAPL",
+            "IBM",
+            "AMZN",
+            "CRM",
+            "MSFT"
+          ],
+          "confidence": 0.82,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0011",
+          "ranking": [
+            "V",
+            "JPM",
+            "AXP",
+            "TRV",
+            "GS"
+          ],
+          "confidence": 0.85,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0012",
+          "ranking": [
+            "TRV",
+            "JPM",
+            "V",
+            "GS",
+            "AXP"
+          ],
+          "confidence": 0.82,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0013",
+          "ranking": [
+            "BA",
+            "CAT",
+            "HON"
+          ],
+          "confidence": 0.85,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0014",
+          "ranking": [
+            "AMZN",
+            "AAPL",
+            "MCD"
+          ],
+          "confidence": 0.78,
+          "hit_at_1": false,
+          "hit_at_5": false,
+          "rank": null
+        },
+        {
+          "target_id": "target-0015",
+          "ranking": [
+            "AMGN",
+            "UNH",
+            "JNJ"
+          ],
+          "confidence": 0.85,
+          "hit_at_1": false,
+          "hit_at_5": true,
+          "rank": 2
+        },
+        {
+          "target_id": "target-0016",
+          "ranking": [
+            "AMGN",
+            "UNH",
+            "JNJ"
+          ],
+          "confidence": 0.85,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0017",
+          "ranking": [
+            "AXP",
+            "TRV",
+            "V",
+            "JPM",
+            "GS"
+          ],
+          "confidence": 0.85,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0018",
+          "ranking": [
+            "MSFT",
+            "CRM",
+            "IBM",
+            "AMZN",
+            "AAPL"
+          ],
+          "confidence": 0.88,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0019",
+          "ranking": [
+            "HON",
+            "BA",
+            "CAT"
+          ],
+          "confidence": 0.85,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0020",
+          "ranking": [
+            "JNJ",
+            "UNH",
+            "AMGN"
+          ],
+          "confidence": 0.82,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        }
+      ],
+      "link_predictions": [
+        {
+          "pair_id": "pair-0001",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0002",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0003",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0004",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0005",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0006",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0007",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0008",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0009",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0010",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0011",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0012",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0013",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0014",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0015",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0016",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0017",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0018",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0019",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0020",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0021",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0022",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0023",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0024",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0025",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0026",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0027",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0028",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0029",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0030",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0031",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0032",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0033",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0034",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0035",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0036",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0037",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0038",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0039",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0040",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0041",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0042",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0043",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0044",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0045",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0046",
+          "same_probability": 0.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0047",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0048",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0049",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0050",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0051",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0052",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0053",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0054",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0055",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0056",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0057",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0058",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0059",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0060",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0061",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0062",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0063",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0064",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0065",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0066",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0067",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0068",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0069",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0070",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0071",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0072",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0073",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0074",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0075",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0076",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0077",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0078",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0079",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0080",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0081",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0082",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0083",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0084",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0085",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0086",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0087",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0088",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0089",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0090",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0091",
+          "same_probability": 0.95,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0092",
+          "same_probability": 0.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0093",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0094",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0095",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0096",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0097",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0098",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0099",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0100",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0101",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0102",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0103",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0104",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0105",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0106",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0107",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0108",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0109",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0110",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0111",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0112",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0113",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0114",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0115",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0116",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0117",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0118",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0119",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0120",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0121",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0122",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0123",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0124",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0125",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0126",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0127",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0128",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0129",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0130",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0131",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0132",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0133",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0134",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0135",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0136",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0137",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0138",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0139",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0140",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0141",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0142",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0143",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0144",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0145",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0146",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0147",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0148",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0149",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0150",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0151",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0152",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0153",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0154",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0155",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0156",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0157",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0158",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0159",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0160",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0161",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0162",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0163",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0164",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0165",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0166",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0167",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0168",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0169",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0170",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0171",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0172",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0173",
+          "same_probability": 1.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0174",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0175",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0176",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0177",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0178",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0179",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0180",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0181",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0182",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0183",
+          "same_probability": 1.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0184",
+          "same_probability": 1.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0185",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0186",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0187",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0188",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0189",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0190",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0191",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0192",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0193",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0194",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0195",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0196",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0197",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0198",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0199",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0200",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        }
+      ],
+      "status": "ok"
+    },
+    {
+      "benchmark": "StockBench",
+      "method": "finscope",
+      "prior_level": "K4",
+      "trace_length": "full",
+      "candidate_count": 20,
+      "identity_targets": 20,
+      "identity_coverage": 1.0,
+      "reid_at_1": 0.85,
+      "reid_at_1_ci95": [
+        0.6395767041130426,
+        0.9476322080405041
+      ],
+      "reid_at_5": 0.95,
+      "reid_at_5_ci95": [
+        0.7638641064874331,
+        0.9911187805671268
+      ],
+      "mrr": 0.885,
+      "link_pairs": 200,
+      "link_coverage": 1.0,
+      "link_auc": 0.97485,
+      "link_auc_ci95": [
+        0.95,
+        0.995
+      ],
+      "link_auprc": 0.9606029702970297,
+      "link_auprc_ci95": [
+        0.9234239482200648,
+        0.9900990099009901
+      ],
+      "link_tpr_at_1pct_fpr": 0.0,
+      "exposure_state": {
+        "alias_occurrences": 17814,
+        "age_days": 19,
+        "visible_roles": [
+          "decision_agent",
+          "fundamental_filter"
+        ],
+        "market_events": 43,
+        "trade_events": 0,
+        "distinct_assets": [
+          "AAPL",
+          "AMGN",
+          "AMZN",
+          "AXP",
+          "BA",
+          "CAT",
+          "CRM",
+          "GS",
+          "HD",
+          "HON",
+          "IBM",
+          "JNJ",
+          "JPM",
+          "MCD",
+          "MSFT",
+          "PG",
+          "SHW",
+          "TRV",
+          "UNH",
+          "V"
+        ],
+        "high_risk_events": 23
+      },
+      "identity_predictions": [
+        {
+          "target_id": "target-0001",
+          "ranking": [
+            "JPM",
+            "V",
+            "AXP",
+            "TRV",
+            "GS"
+          ],
+          "confidence": 0.87,
+          "hit_at_1": false,
+          "hit_at_5": true,
+          "rank": 5
+        },
+        {
+          "target_id": "target-0002",
+          "ranking": [
+            "JPM",
+            "V",
+            "AXP",
+            "TRV",
+            "GS"
+          ],
+          "confidence": 0.85,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0003",
+          "ranking": [
+            "MCD",
+            "PG",
+            "HD",
+            "AMZN",
+            "CRM"
+          ],
+          "confidence": 0.85,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0004",
+          "ranking": [
+            "PG",
+            "HD",
+            "AMZN",
+            "MCD",
+            "CRM"
+          ],
+          "confidence": 0.82,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0005",
+          "ranking": [
+            "CRM",
+            "MSFT",
+            "AMZN",
+            "AAPL",
+            "IBM"
+          ],
+          "confidence": 0.82,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0006",
+          "ranking": [
+            "CAT",
+            "HON",
+            "BA",
+            "SHW",
+            "IBM"
+          ],
+          "confidence": 0.79,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0007",
+          "ranking": [
+            "AMZN",
+            "PG",
+            "MCD",
+            "CRM",
+            "HD"
+          ],
+          "confidence": 0.85,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0008",
+          "ranking": [
+            "SHW",
+            "HON",
+            "HD",
+            "PG",
+            "MCD"
+          ],
+          "confidence": 0.72,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0009",
+          "ranking": [
+            "IBM",
+            "CRM",
+            "AAPL",
+            "AMZN",
+            "MSFT"
+          ],
+          "confidence": 0.85,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0010",
+          "ranking": [
+            "AAPL",
+            "IBM",
+            "AMZN",
+            "CRM",
+            "MSFT"
+          ],
+          "confidence": 0.82,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0011",
+          "ranking": [
+            "V",
+            "JPM",
+            "AXP",
+            "TRV",
+            "GS"
+          ],
+          "confidence": 0.85,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0012",
+          "ranking": [
+            "TRV",
+            "JPM",
+            "V",
+            "GS",
+            "AXP"
+          ],
+          "confidence": 0.82,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0013",
+          "ranking": [
+            "BA",
+            "CAT",
+            "HON"
+          ],
+          "confidence": 0.85,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0014",
+          "ranking": [
+            "AMZN",
+            "AAPL",
+            "MCD"
+          ],
+          "confidence": 0.78,
+          "hit_at_1": false,
+          "hit_at_5": false,
+          "rank": null
+        },
+        {
+          "target_id": "target-0015",
+          "ranking": [
+            "AMGN",
+            "UNH",
+            "JNJ"
+          ],
+          "confidence": 0.85,
+          "hit_at_1": false,
+          "hit_at_5": true,
+          "rank": 2
+        },
+        {
+          "target_id": "target-0016",
+          "ranking": [
+            "AMGN",
+            "UNH",
+            "JNJ"
+          ],
+          "confidence": 0.85,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0017",
+          "ranking": [
+            "AXP",
+            "TRV",
+            "V",
+            "JPM",
+            "GS"
+          ],
+          "confidence": 0.85,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0018",
+          "ranking": [
+            "MSFT",
+            "CRM",
+            "IBM",
+            "AMZN",
+            "AAPL"
+          ],
+          "confidence": 0.88,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0019",
+          "ranking": [
+            "HON",
+            "BA",
+            "CAT"
+          ],
+          "confidence": 0.85,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        },
+        {
+          "target_id": "target-0020",
+          "ranking": [
+            "JNJ",
+            "UNH",
+            "AMGN"
+          ],
+          "confidence": 0.82,
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "rank": 1
+        }
+      ],
+      "link_predictions": [
+        {
+          "pair_id": "pair-0001",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0002",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0003",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0004",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0005",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0006",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0007",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0008",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0009",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0010",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0011",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0012",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0013",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0014",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0015",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0016",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0017",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0018",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0019",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0020",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0021",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0022",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0023",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0024",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0025",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0026",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0027",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0028",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0029",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0030",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0031",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0032",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0033",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0034",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0035",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0036",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0037",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0038",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0039",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0040",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0041",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0042",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0043",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0044",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0045",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0046",
+          "same_probability": 0.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0047",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0048",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0049",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0050",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0051",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0052",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0053",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0054",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0055",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0056",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0057",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0058",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0059",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0060",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0061",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0062",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0063",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0064",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0065",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0066",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0067",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0068",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0069",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0070",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0071",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0072",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0073",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0074",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0075",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0076",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0077",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0078",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0079",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0080",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0081",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0082",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0083",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0084",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0085",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0086",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0087",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0088",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0089",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0090",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0091",
+          "same_probability": 0.95,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0092",
+          "same_probability": 0.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0093",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0094",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0095",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0096",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0097",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0098",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0099",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0100",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0101",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0102",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0103",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0104",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0105",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0106",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0107",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0108",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0109",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0110",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0111",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0112",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0113",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0114",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0115",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0116",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0117",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0118",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0119",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0120",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0121",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0122",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0123",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0124",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0125",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0126",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0127",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0128",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0129",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0130",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0131",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0132",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0133",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0134",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0135",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0136",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0137",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0138",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0139",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0140",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0141",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0142",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0143",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0144",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0145",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0146",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0147",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0148",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0149",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0150",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0151",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0152",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0153",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0154",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0155",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0156",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0157",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0158",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0159",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0160",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0161",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0162",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0163",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0164",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0165",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0166",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0167",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0168",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0169",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0170",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0171",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0172",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0173",
+          "same_probability": 1.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0174",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0175",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0176",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0177",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0178",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0179",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0180",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0181",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0182",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0183",
+          "same_probability": 1.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0184",
+          "same_probability": 1.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0185",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0186",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0187",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0188",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0189",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0190",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0191",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0192",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0193",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0194",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0195",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0196",
+          "same_probability": 0.0,
+          "same_entity": false,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0197",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0198",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0199",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        },
+        {
+          "pair_id": "pair-0200",
+          "same_probability": 1.0,
+          "same_entity": true,
+          "model_returned": true
+        }
+      ],
+      "status": "ok"
+    }
+  ]
+}

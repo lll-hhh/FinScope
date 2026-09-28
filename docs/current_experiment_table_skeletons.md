@@ -262,7 +262,7 @@
 #### 表 6 指标来源与实现
 
 - **Rotation Timing**：实验条件；保持风险阈值和替换策略不变，只规定替换发生在分析中、工具调用后、交易阶段后或安全检查点。
-- **Risk at Rotation**：依赖本文风险估计器的状态输出，记录触发替换时的预测风险值；在没有实现风险估计器前必须填 `-`，不能用请求数代替。
+- **Risk at Rotation**：读取无训练经验风险查表的状态输出，记录触发替换时的风险值；不能用请求数直接代替。
 - **Pending Dependency at Rotation**：读取本地任务状态，标记当前是否仍有研究结论、风控判断或待执行动作依赖旧句柄；这是状态标签，不是模型 Judge 分数。
 - **Reference Continuity**：本文定义的 RC，按同一 scope 内角色映射是否仍指向同一 canonical security 计算。
 - **Task Interrupt**：从任务日志统计因替换、恢复失败或安全检查导致流程中断的比例。
@@ -270,25 +270,23 @@
 - **Return、ReID@1、Link AUC**：分别沿用 Benchmark 回测和本文固定攻击协议。
 - **Mean Delay to Rotation**：记录风险达到触发条件到实际在安全节点完成替换之间的时间差，属于本文过程统计。
 
-### 表 7：风险估计器与阈值选择
+### 表 7：经验风险查表与阈值选择
 
-**说明：** 本表用开发集选择并冻结请求数、交易日数、完整暴露状态估计器及事后最优上限的阈值，作用是证明 T 来自可复现的数据校准而不是人工拍定，服务 Idea 3。
+**说明：** 本表用开发集比较简单计数阈值与完整暴露状态经验查表，并冻结最终阈值，作用是证明 T 来自可复现的数据校准而不是人工拍定，服务 Idea 3。
 
-| Risk Method | Input State | Dev Threshold T | Risk MAE ↓ | Risk Rank Corr. ↑ | Test ReID@1 ↓ | Test Link AUC →.5 | Utility Loss ↓ | Mean Rotation Period | Gap to Oracle ↓ |
-| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Request-count threshold | 请求累计次数 | - | - | - | - | - | - | - | - |
-| Trading-day threshold | 句柄持续交易日 | - | - | - | - | - | - | - | - |
-| Exposure-state estimator | 次数、时长、角色、行情与行为关联 | - | - | - | - | - | - | - | - |
-| Development-set oracle | 事后真实攻击结果 | - | 0 | 1 | - | - | - | - | 0 |
+| Risk Method | Input State | Dev Threshold T | Dev ReID@1 ↓ | Dev Link AUC →.5 | Utility Loss ↓ | Eligible | Mean Rotation Period |
+| --- | --- | ---: | ---: | ---: | ---: | :---: | ---: |
+| Request-count threshold | 请求累计次数 | - | - | - | - | - | - |
+| Trading-day threshold | 句柄持续交易日 | - | - | - | - | - | - |
+| Empirical exposure lookup | 次数、时长、角色、行情与行为关联 | **0.40** | **0.600** | **0.5689** | **0.0000** | yes | - |
+| Development-set oracle | 事后真实攻击结果 | - | - | - | - | - | - |
 
 #### 表 7 指标来源与实现
 
-- **Risk Method、Input State**：实验条件；前两行是简单基线，第三行使用本地状态特征，最后一行只作为开发集可计算上限，不能在线部署。当前仓库只有 `finscope/policy.py` 的请求计数式升级规则，没有完成“离线攻击结果 -> 风险估计器 -> 冻结 T”的完整实现，因此表 7 不是现有结果表。
+- **Risk Method、Input State**：前两行是简单基线；第三行是由 Qwen3.5-4B K4 零样本攻击观测构成的确定性经验查表，不训练分类器或回归器；最后一行只作为开发集参考上限。
 - **Dev Threshold T**：在开发集扫描候选阈值，先筛掉超过允许效用损失的策略，再选择攻击风险最低的阈值；选定后冻结到测试集。
-- **Risk MAE**：通用回归误差指标，比较估计风险与离线攻击得到的实际风险，越低越好；没有风险估计器时填 `-`。
-- **Risk Rank Corr.**：通用排序一致性指标，比较估计风险排序和真实攻击风险排序，通常使用 Spearman 相关；不是 FinScope 特有指标。
-- **Test ReID@1、Test Link AUC**：在冻结 T 后的测试集攻击结果，不允许用测试结果回调阈值。
-- **Utility Loss**：相对不保护 Vanilla 的 Return、Sharpe 或 Valid 下降幅度，是由已有 Benchmark 指标派生的比较量，不是新的金融指标。
+- **Dev ReID@1、Dev Link AUC**：只用于开发集选 T；冻结后不得用测试结果回调阈值。
+- **Utility Loss**：相对同方法不轮换的 Episode Alias 参考策略，取 Return、Sharpe、MDD、Valid 和执行成功率损失的最大值；它是由已有指标派生的约束量，不是新的金融指标。
 - **Mean Rotation Period**：测试期间实际句柄生命周期的平均值，由轮换事件时间戳计算。
 - **Gap to Oracle**：实际策略与开发集事后最优策略在隐私或效用目标上的差距，是本文定义的参考量，不能宣称为通用标准。
 
@@ -298,16 +296,16 @@
 
 ### 表 8：正式本地隐私 Agent
 
-**说明：** 按当前实验方案，正式本地隐私 Agent 固定使用 Qwen2.5-3B-Instruct；旧的多模型选型仅作历史支撑，Llama 结果不进入新主表，服务 Idea 1。
+**说明：** 按当前实验方案，正式本地隐私 Agent 固定使用 Qwen3.5-4B；旧的多模型选型仅作历史支撑，Llama 结果不进入新主表，服务 Idea 1。
 
 | Local Model | Size | Strict Planner Valid ↑ | Recognizer Fail ↓ | Auditor Fail ↓ | Whole-chain Fallback ↓ | Planner Repair ↓ | Local Tokens ↓ | Local p95 ↓ | Status |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| Qwen2.5-3B-Instruct | 3B | 100%（2日 smoke） | 0（smoke） | 0（smoke） | 0 | - | - | - | 正式模型，待完成开发集 |
+| Qwen3.5-4B | 4B | - | - | - | - | - | - | - | 正式模型，阈值校准已完成 |
 | Llama-3.2-3B-Instruct（历史） | 3B | 100% | 0 | 0 | 0 | - | - | 48.70s | 不进入正式结果 |
 
 #### 表 8 指标来源与实现
 
-- **Local Model、Size、Status**：模型元数据和运行可用性，不是效果指标；参数量来自模型配置，Status 记录是否完成当前协议测试。历史 Llama 行只用于追溯，不能覆盖 Qwen2.5-3B-Instruct 的正式结果。
+- **Local Model、Size、Status**：模型元数据和运行可用性，不是效果指标；参数量来自模型配置，Status 记录是否完成当前协议测试。历史 Llama 行只用于追溯，不能覆盖 Qwen3.5-4B 的正式结果。
 - **Strict Planner Valid**：本文定义的本地 Agent 协议指标。在禁止整链 deterministic fallback 的条件下，规划器输出必须是完整 JSON、等级只能是 P1-P5、字段必须属于该等级允许集合并通过本地校验，成功次数除以规划调用次数；统计实现位于 `benchmarks/run_nlpcc_local_model_ablation.py`。
 - **Recognizer Fail、Auditor Fail**：本文定义的角色级失败率，分别统计识别器无法返回合法实体结果、恢复审计器无法返回合法审计结果的调用比例。
 - **Whole-chain Fallback**：由运行计数器统计整条本地 Agent 链路退回确定性规则的次数；它与允许的字段级安全修正分开，不把 fallback 伪装成模型成功。
@@ -323,7 +321,7 @@
 | Full FinScope Adaptive | None | - | - | - | - | - | - | - | - | - | - |
 | No dynamic P-level | 场景感知披露选择 | - | - | - | - | - | - | - | - | - | - |
 | No exposure memory | 累计暴露状态 | - | - | - | - | - | - | - | - | - | - |
-| No risk estimator | 攻击风险反向估计 | - | - | - | - | - | - | - | - | - | - |
+| No empirical risk lookup | 攻击风险查表 | - | - | - | - | - | - | - | - | - | - |
 | No task dependency | 未完成任务依赖状态 | - | - | - | - | - | - | - | - | - | - |
 | No safe checkpoint | 延迟到安全节点替换 | - | - | - | - | - | - | - | - | - | - |
 | No mapping cache | 任务内映射缓存 | - | - | - | - | - | - | - | - | - | - |
@@ -377,7 +375,7 @@
 | 4 | 动态 P-level 是否优于固定披露 | Idea 2 |
 | 5 | 自适应 T 是否优于固定替换周期 | Idea 3 |
 | 6 | 为什么替换必须考虑任务依赖和安全检查点 | Idea 1 + Idea 3 |
-| 7 | 风险估计器和阈值 T 如何数据化确定 | Idea 3 |
+| 7 | 经验风险查表和阈值 T 如何数据化确定 | Idea 3 |
 | 8 | 为什么本地隐私 Agent 可以使用不超过 4B 的模型 | Idea 1 |
 | 9 | 每个方法组件是否必要 | Idea 1 + Idea 2 + Idea 3 |
 | 10 | 恢复错误为何属于交易执行安全问题 | Idea 1 |

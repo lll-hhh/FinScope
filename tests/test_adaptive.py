@@ -6,16 +6,16 @@ from finscope import (
     AttackObservation,
     DevPolicyResult,
     DisclosureLevel,
+    EmpiricalRiskLookup,
     ExposureState,
     ReplacementDecision,
-    RiskEstimator,
     TaskDependencyState,
     calibrate_threshold,
 )
 
 
 class AdaptiveControllerTests(unittest.TestCase):
-    def estimator(self):
+    def risk_lookup(self):
         rows = []
         for count in (1, 10, 50, 100):
             state = ExposureState(
@@ -28,7 +28,7 @@ class AdaptiveControllerTests(unittest.TestCase):
                 high_risk_events=count // 20,
             )
             rows.append(AttackObservation(state.features(), count / 100.0, 0.5 + count / 200.0))
-        return RiskEstimator().fit(rows)
+        return EmpiricalRiskLookup(rows)
 
     def test_threshold_is_calibrated_under_utility_constraint(self):
         threshold = calibrate_threshold(
@@ -41,12 +41,16 @@ class AdaptiveControllerTests(unittest.TestCase):
         self.assertEqual(threshold, 0.5)
 
     def test_dependency_defers_rotation_until_checkpoint(self):
-        controller = AdaptiveReplacementController(self.estimator(), threshold=0.2)
+        controller = AdaptiveReplacementController(self.risk_lookup(), threshold=0.2)
         controller.bind_scope("scope-old")
         decision = controller.observe_call(
             alias_occurrences=50,
             elapsed_days=20,
             visible_roles=("research", "risk"),
+            market_events=50,
+            trade_events=25,
+            assets=("A", "B", "C"),
+            high_risk_events=2,
             field_risk=3,
             dependencies=TaskDependencyState(pending_action=True),
         )
@@ -59,7 +63,7 @@ class AdaptiveControllerTests(unittest.TestCase):
         self.assertEqual(checkpoint.decision, ReplacementDecision.REPLACE_NOW)
 
     def test_disclosure_level_is_monotone_with_risk(self):
-        class StubEstimator:
+        class StubLookup:
             def __init__(self):
                 self.score = 0.0
 
@@ -68,11 +72,11 @@ class AdaptiveControllerTests(unittest.TestCase):
 
                 return RiskEstimate(self.score, 0.5)
 
-        estimator = StubEstimator()
-        controller = AdaptiveReplacementController(estimator, threshold=1.0)
+        lookup = StubLookup()
+        controller = AdaptiveReplacementController(lookup, threshold=1.0)
         levels = []
         for score in (0.0, 0.2, 0.45, 0.7):
-            estimator.score = score
+            lookup.score = score
             levels.append(controller.choose_level())
         self.assertEqual(
             levels,
@@ -85,13 +89,13 @@ class AdaptiveControllerTests(unittest.TestCase):
         )
 
         controller = AdaptiveReplacementController(
-            estimator, threshold=1.0, default_level=DisclosureLevel.P3
+            lookup, threshold=1.0, default_level=DisclosureLevel.P3
         )
-        estimator.score = 0.2
+        lookup.score = 0.2
         self.assertEqual(controller.choose_level(), DisclosureLevel.P3)
 
     def test_rotation_resets_exposure_without_exporting_aliases(self):
-        controller = AdaptiveReplacementController(self.estimator(), threshold=0.2)
+        controller = AdaptiveReplacementController(self.risk_lookup(), threshold=0.2)
         controller.bind_scope("scope-old")
         controller.observe_call(alias_occurrences=50, elapsed_days=10)
         reset = controller.reset_session("scope-new", {"research_summary": "sector allocation"})
@@ -119,7 +123,7 @@ class AdaptiveControllerTests(unittest.TestCase):
                 }
             ]
         )
-        controller = AdaptiveReplacementController(self.estimator(), threshold=0.1)
+        controller = AdaptiveReplacementController(self.risk_lookup(), threshold=0.1)
         runtime = AdaptiveRuntime(agent, controller)
         scope = agent.open_scope("task", "2026-09-05")
         protected, level = runtime.prepare({"asset": "AAPL"}, scope)
@@ -128,6 +132,23 @@ class AdaptiveControllerTests(unittest.TestCase):
         new_scope, reset = runtime.rotate_at_checkpoint(scope, {"summary": "keep technology exposure"})
         self.assertNotEqual(new_scope.id, scope.id)
         self.assertEqual(reset.old_scope_id, scope.id)
+
+    def test_lookup_is_monotone_and_requires_no_training(self):
+        lookup = self.risk_lookup()
+        scores = []
+        for count in (1, 10, 50, 100):
+            state = ExposureState(
+                alias_occurrences=count,
+                age_days=count,
+                visible_roles={"research", "risk"},
+                market_events=count,
+                trade_events=count // 2,
+                distinct_assets={"A", "B"},
+                high_risk_events=count // 20,
+            )
+            scores.append(lookup.predict(state).combined)
+        self.assertEqual(scores, sorted(scores))
+        self.assertTrue(lookup.ready)
 
 
 if __name__ == "__main__":

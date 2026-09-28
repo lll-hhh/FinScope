@@ -1,4 +1,4 @@
-"""Calibrate FinScope's risk estimator and replacement threshold on development data.
+"""Build FinScope's empirical risk lookup and select T on development data.
 
 The attack artifact supplies labelled exposure -> (ReID@1, Link AUC) examples.
 The utility artifact is produced by replaying candidate thresholds on the
@@ -13,7 +13,11 @@ import json
 from pathlib import Path
 from typing import Any, Dict, Mapping, Sequence
 
-from finscope import DevPolicyResult, calibrate_threshold, fit_risk_estimator
+from finscope import (
+    DevPolicyResult,
+    build_empirical_risk_lookup,
+    calibrate_threshold,
+)
 
 
 def _rows(path: Path) -> Sequence[Mapping[str, Any]]:
@@ -30,9 +34,9 @@ def main() -> None:
     parser.add_argument("--utility-artifact", required=True, type=Path)
     parser.add_argument("--max-utility-loss", required=True, type=float)
     parser.add_argument(
-        "--estimator-method",
+        "--lookup-method",
         default="finscope",
-        help="method whose attack rows train the online risk estimator (default: finscope)",
+        help="method whose K4 attack rows populate the online lookup (default: finscope)",
     )
     parser.add_argument("--output", required=True, type=Path)
     args = parser.parse_args()
@@ -41,15 +45,15 @@ def main() -> None:
     utility_rows = list(_rows(args.utility_artifact))
     if not attack_rows:
         raise ValueError("attack artifact has no rows")
-    estimator_method = str(args.estimator_method).strip()
-    estimator_rows = (
-        [row for row in attack_rows if str(row.get("method", "")) == estimator_method]
-        if estimator_method
+    lookup_method = str(args.lookup_method).strip()
+    lookup_rows = (
+        [row for row in attack_rows if str(row.get("method", "")) == lookup_method]
+        if lookup_method
         else attack_rows
     )
-    if not estimator_rows:
+    if not lookup_rows:
         raise ValueError(
-            "attack artifact has no rows for estimator method %r" % estimator_method
+            "attack artifact has no rows for lookup method %r" % lookup_method
         )
     candidates = []
     for row in utility_rows:
@@ -61,16 +65,20 @@ def main() -> None:
                 float(row["utility_loss"]),
                 float(row.get("reid_at_1", row.get("reid", 1.0))),
                 float(row.get("link_auc", 1.0)),
+                bool(row.get("eligible", row.get("non_degenerate", True))),
             )
         )
     threshold = calibrate_threshold(candidates, max_utility_loss=args.max_utility_loss)
-    estimator = fit_risk_estimator(estimator_rows)
+    lookup = build_empirical_risk_lookup(lookup_rows)
     selected = min(
-        (item for item in candidates if item.utility_loss <= args.max_utility_loss),
+        (
+            item for item in candidates
+            if item.eligible and item.utility_loss <= args.max_utility_loss
+        ),
         key=lambda item: (item.privacy_risk, item.threshold),
     )
     result: Dict[str, Any] = {
-        "schema_version": 1,
+        "schema_version": 2,
         "threshold": threshold,
         "max_utility_loss": args.max_utility_loss,
         "selected_development_policy": {
@@ -79,17 +87,25 @@ def main() -> None:
             "reid_at_1": selected.reid_at_1,
             "link_auc": selected.link_auc,
         },
-        "estimator": {
-            "type": "ridge",
-            "ridge": estimator.ridge,
-            "training_rows": len(estimator_rows),
-            "method_filter": estimator_method,
+        "risk_lookup": {
+            "type": "empirical_lookup",
+            "observation_rows": lookup.observation_count,
+            "points": [
+                {
+                    "exposure_index": index,
+                    "reid_at_1": risk.reid_at_1,
+                    "link_auc": risk.link_auc,
+                }
+                for index, risk in lookup.points
+            ],
+            "method_filter": lookup_method,
             "source": str(args.attack_artifact),
+            "training": False,
         },
         # ``rows`` is deliberately restricted to the selected method because
-        # the proxy loads this field for its online estimator. Keep the full
+        # the proxy loads this field for its online lookup. Keep the full
         # attack table separately for reporting and auditability.
-        "rows": estimator_rows,
+        "rows": lookup_rows,
         "attack_rows": attack_rows,
         "protocol": "development-only threshold selection; test split is untouched",
     }

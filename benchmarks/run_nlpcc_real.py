@@ -29,11 +29,11 @@ from finscope import (
     AdaptiveReplacementController,
     AdaptiveRuntime,
     AmbiguousRestorationError,
+    EmpiricalRiskLookup,
     LocalPrivacyAgent,
     ReplacementDecision,
-    RiskEstimator,
     TaskDependencyState,
-    load_risk_estimator,
+    load_empirical_risk_lookup,
 )
 from benchmarks.run_benchmark import BackendResult, OpenAIBackend, TransformersBackend
 from benchmarks.local_privacy_agent import (
@@ -220,7 +220,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--privacy-model-name",
-        default="Qwen2.5-3B-Instruct",
+        default="qwen35_4b",
         help="served model ID for the local privacy Agent",
     )
     parser.add_argument("--start-date", default="2025-01-02")
@@ -238,7 +238,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--adaptive-threshold",
         type=float,
-        default=float(os.environ.get("FINSCOPE_ADAPTIVE_T", "0.60")),
+        default=float(os.environ.get("FINSCOPE_ADAPTIVE_T", "0.40")),
     )
     parser.add_argument(
         "--adaptive-calibration",
@@ -1386,13 +1386,13 @@ def run(args: argparse.Namespace) -> Dict[str, Any]:
         asset: f"FIXED_ASSET_{index:03d}"
         for index, asset in enumerate(FUND_POOL, start=1)
     }
-    risk_estimator = (
-        load_risk_estimator(args.adaptive_calibration)
+    risk_lookup = (
+        load_empirical_risk_lookup(args.adaptive_calibration)
         if args.adaptive_calibration
-        else RiskEstimator()
+        else EmpiricalRiskLookup()
     )
     adaptive_controller = AdaptiveReplacementController(
-        risk_estimator,
+        risk_lookup,
         threshold=args.adaptive_threshold,
         default_level=args.disclosure_level,
     )
@@ -1574,7 +1574,7 @@ def run(args: argparse.Namespace) -> Dict[str, Any]:
                     "field_risk": field_risk,
                     "exposure_state": exposure_snapshot,
                     "rotation": rotation,
-                    "estimator_fitted": adaptive_controller.estimator.fitted,
+                    "risk_lookup_ready": adaptive_controller.risk_lookup.ready,
                 }
             postprocess_ms = (time.perf_counter() - post_started) * 1000
             values[method].append(portfolio.value)

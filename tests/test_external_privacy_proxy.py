@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from dataclasses import replace
+import json
 import tempfile
 import unittest
 
@@ -13,6 +14,7 @@ from benchmarks.serve_privacy_proxy import (
     finvault_catalog,
     stockbench_catalog,
 )
+from finscope import AttackObservation, EmpiricalRiskLookup
 
 
 def config(method: str, audit: Path) -> ProxyConfig:
@@ -86,6 +88,9 @@ class ExternalPrivacyProxyTests(unittest.TestCase):
                     adaptive_threshold=0.01,
                 ),
                 stockbench_catalog(),
+            )
+            controller.risk_lookup = EmpiricalRiskLookup(
+                [AttackObservation((1.0,) * 7, 1.0, 1.0)]
             )
             first_request = {
                 "finscope_task": "backtest-rotation",
@@ -174,6 +179,109 @@ class ExternalPrivacyProxyTests(unittest.TestCase):
             self.assertEqual(issues, [])
             self.assertIn("AAPL", restored["choices"][0]["message"]["content"])
 
+    def test_finscope_restores_handles_inside_json_message_content(self):
+        with tempfile.TemporaryDirectory() as directory:
+            controller = PrivacyController(
+                config("finscope", Path(directory) / "audit.jsonl"),
+                stockbench_catalog(),
+            )
+            outbound, state = controller.transform(
+                {
+                    "model": "model",
+                    "messages": [{"role": "user", "content": "Choose AAPL"}],
+                },
+                "2025-03-03",
+            )
+            protected = outbound["messages"][0]["content"].split("Choose ", 1)[1]
+            response = {
+                "choices": [
+                    {
+                        "message": {
+                            "role": "assistant",
+                            "content": json.dumps(
+                                {
+                                    "decisions": {
+                                        protected: {
+                                            "action": "increase",
+                                            "target_cash_amount": 5000.0,
+                                        }
+                                    }
+                                }
+                            ),
+                        }
+                    }
+                ],
+                "usage": {},
+            }
+            restored, status, exact, issues = controller.restore(response, state)
+            parsed = json.loads(restored["choices"][0]["message"]["content"])
+            self.assertEqual(status, "safe")
+            self.assertTrue(exact)
+            self.assertEqual(issues, [])
+            self.assertIn("AAPL", parsed["decisions"])
+
+    def test_restored_canonical_wrappers_are_plain_local_identifiers(self):
+        with tempfile.TemporaryDirectory() as directory:
+            controller = PrivacyController(
+                config("finscope", Path(directory) / "audit.jsonl"),
+                stockbench_catalog(),
+            )
+            outbound, state = controller.transform(
+                {
+                    "model": "model",
+                    "messages": [{"role": "user", "content": "Choose AAPL"}],
+                },
+                "2025-03-03",
+            )
+            alias = outbound["messages"][0]["content"].split("id=\"", 1)[1].split("\"", 1)[0]
+            response = {
+                "choices": [
+                    {
+                        "message": {
+                            "role": "assistant",
+                            "content": f'<fin-ref type="asset" id="{alias}">stock</fin-ref>',
+                        }
+                    }
+                ]
+            }
+            restored, status, exact, _ = controller.restore(response, state)
+            content = restored["choices"][0]["message"]["content"]
+            self.assertEqual(status, "needs_retry")
+            self.assertTrue(exact)
+            self.assertEqual(content, "AAPL")
+
+    def test_restores_json_escaped_handle_wrapper(self):
+        with tempfile.TemporaryDirectory() as directory:
+            controller = PrivacyController(
+                config("finscope", Path(directory) / "audit.jsonl"),
+                stockbench_catalog(),
+            )
+            outbound, state = controller.transform(
+                {
+                    "model": "model",
+                    "messages": [{"role": "user", "content": "Choose AAPL"}],
+                },
+                "2025-03-03",
+            )
+            alias = outbound["messages"][0]["content"].split('id="', 1)[1].split('"', 1)[0]
+            response = {
+                "choices": [
+                    {
+                        "message": {
+                            "role": "assistant",
+                            "content": (
+                                '<DECISION>{"decisions":{"<fin-ref type=\\"asset\\" '
+                                f'id=\\"{alias}\\">stock</fin-ref>":{{"action":"hold"}}}}}}'
+                            ),
+                        }
+                    }
+                ]
+            }
+            restored, status, exact, _ = controller.restore(response, state)
+            self.assertTrue(exact)
+            self.assertIn("AAPL", restored["choices"][0]["message"]["content"])
+            self.assertNotIn("fin-ref", restored["choices"][0]["message"]["content"])
+
     def test_proxy_metadata_is_not_forwarded_upstream(self):
         with tempfile.TemporaryDirectory() as directory:
             controller = PrivacyController(
@@ -191,6 +299,22 @@ class ExternalPrivacyProxyTests(unittest.TestCase):
             )
             self.assertNotIn("finscope_episode", outbound)
             self.assertNotIn("finscope_role", outbound)
+
+    def test_task_model_thinking_is_disabled(self):
+        with tempfile.TemporaryDirectory() as directory:
+            controller = PrivacyController(
+                config("vanilla", Path(directory) / "audit.jsonl"),
+                stockbench_catalog(),
+            )
+            outbound, _ = controller.transform(
+                {
+                    "model": "proxy-model",
+                    "messages": [{"role": "user", "content": "Choose AAPL"}],
+                    "chat_template_kwargs": {"enable_thinking": True},
+                },
+                "2025-03-03",
+            )
+            self.assertFalse(outbound["chat_template_kwargs"]["enable_thinking"])
 
     def test_llm_rewrite_audits_identity_exposure_to_rewriter(self):
         with tempfile.TemporaryDirectory() as directory:

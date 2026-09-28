@@ -4,7 +4,7 @@ The proxy audit log intentionally contains no raw prompt or local mapping. The
 runner reconstructs only the information that an attacker is allowed to use:
 the public catalog, public indicator cache, and the observable cross-round
 alias/role pattern. It emits one flat row per (method, prior, trace length),
-which can be consumed by ``finscope.adaptive.fit_risk_estimator``.
+which can be consumed by ``finscope.adaptive.build_empirical_risk_lookup``.
 """
 
 from __future__ import annotations

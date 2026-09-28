@@ -62,8 +62,8 @@ select_model() {
 import json, os, pathlib, sys
 payload = {
     "selection_rule": "fixed by study protocol",
-    "model_id": os.environ.get("LOCAL_PRIVACY_MODEL_ID") or "Qwen/Qwen2.5-3B-Instruct",
-    "model_name": os.environ.get("LOCAL_PRIVACY_MODEL_NAME") or "Qwen2.5-3B-Instruct",
+    "model_id": os.environ.get("LOCAL_PRIVACY_MODEL_ID") or "Qwen/Qwen3.5-4B",
+    "model_name": os.environ.get("LOCAL_PRIVACY_MODEL_NAME") or "qwen35_4b",
     "local_path": os.environ["LOCAL_PRIVACY_MODEL_PATH"],
     "parameters_b": float(os.environ.get("LOCAL_PRIVACY_PARAMETERS_B") or 3.0),
     "fallback_allowed": True,

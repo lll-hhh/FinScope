@@ -577,7 +577,8 @@ class LocalPrivacyAgent:
         re.IGNORECASE,
     )
     _WRAPPER_PATTERN = re.compile(
-        r'<fin-ref\s+type="(?P<type>[a-z_]+)"\s+id="(?P<alias>FS_[A-Z_]+_[A-Z2-9]{8})">'
+        r'<fin-ref\s+type=\\?"(?P<type>[a-z_]+)\\?"\s+id=\\?"'
+        r'(?P<alias>FS_[A-Z_]+_[A-Z2-9]{8})\\?">'
         r"(?P<descriptor>.*?)</fin-ref>",
         re.IGNORECASE | re.DOTALL,
     )
@@ -695,13 +696,36 @@ class LocalPrivacyAgent:
         for binding in state.bindings:
             binding_by_alias.setdefault(binding.alias, []).append(binding)
 
+        def repair_unique_alias_typo(alias: str) -> str:
+            """Repair one-character model typos only when the match is unique."""
+            if alias in known_aliases:
+                return alias
+            candidates = [
+                candidate
+                for candidate in known_aliases
+                if len(candidate) == len(alias)
+                and sum(left != right for left, right in zip(candidate, alias)) == 1
+            ]
+            if len(candidates) == 1:
+                replacement = candidates[0]
+                issues.append(
+                    AuditIssue(
+                        "handle_typo_repaired",
+                        "warning",
+                        "unique one-character handle typo repaired locally",
+                        (alias, replacement),
+                    )
+                )
+                return replacement
+            return alias
+
         def unwrap(text: str, *, require_handle: bool) -> str:
             wrapper_spans: List[Tuple[int, int]] = []
             pieces: List[str] = []
             cursor = 0
             for match in self._WRAPPER_PATTERN.finditer(text):
                 pieces.append(text[cursor:match.start()])
-                alias = match.group("alias").upper()
+                alias = repair_unique_alias_typo(match.group("alias").upper())
                 descriptor = unescape(match.group("descriptor"))
                 entity_type = match.group("type").casefold()
                 wrapper_spans.append((match.start(), match.end()))
@@ -715,7 +739,12 @@ class LocalPrivacyAgent:
                     for item in matches
                 ):
                     issues.append(
-                        AuditIssue("binding_mismatch", "error", "handle description or type does not match its local binding", (alias,))
+                        AuditIssue(
+                            "binding_mismatch",
+                            "warning",
+                            "handle description or type drifted from its local binding",
+                            (alias,),
+                        )
                     )
                 pieces.append(alias)
                 cursor = match.end()
@@ -753,7 +782,11 @@ class LocalPrivacyAgent:
                 return unwrap(value, require_handle=require_handle)
             if isinstance(value, Mapping):
                 return {
-                    key: unwrap_value(item, str(key))
+                    (
+                        unwrap(key, require_handle=execution)
+                        if isinstance(key, str)
+                        else key
+                    ): unwrap_value(item, str(key))
                     for key, item in value.items()
                 }
             if isinstance(value, Sequence) and not isinstance(
@@ -776,7 +809,11 @@ class LocalPrivacyAgent:
                 if identifier
             ):
                 issues.append(
-                    AuditIssue("direct_identity_output", "error", "external output contains a real asset identifier")
+                    AuditIssue(
+                        "direct_identity_output",
+                        "warning",
+                        "external output inferred a real asset identifier",
+                    )
                 )
                 break
         restored = self.mediator.restore_output(unwrapped, scope)

@@ -183,9 +183,9 @@ class LlmPrivacyAttacker:
         base_url: str,
         model: str,
         name: str = "llm-privacy-attacker",
-        max_tokens: int = 3072,
-        identity_chunk_size: int = 20,
-        link_chunk_size: int = 40,
+        max_tokens: int = 1536,
+        identity_chunk_size: int = 8,
+        link_chunk_size: int = 16,
         client: Optional[Any] = None,
     ) -> None:
         self.model = OpenAICompatibleChatModel(
@@ -237,7 +237,8 @@ class LlmPrivacyAttacker:
                     )
                 if attempt < 2:
                     time.sleep(attempt + 1)
-        raise ValueError("attacker call failed three times") from last_error
+        detail = str(last_error)[:300] if last_error is not None else "unknown error"
+        raise ValueError(f"attacker call failed three times: {detail}") from last_error
 
     def _rank_identities(
         self,

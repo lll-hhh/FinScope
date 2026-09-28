@@ -18,10 +18,10 @@ from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 from finscope import (
     AdaptiveReplacementController,
     AdaptiveRuntime,
+    EmpiricalRiskLookup,
     LocalPrivacyAgent,
-    RiskEstimator,
     TaskDependencyState,
-    load_risk_estimator,
+    load_empirical_risk_lookup,
 )
 from benchmarks.local_privacy_agent import (
     LocalPrivacyModelConfig,
@@ -70,6 +70,11 @@ ALIAS_PATTERN = re.compile(
     re.IGNORECASE,
 )
 REWRITE_MAX_TOKENS = 1024
+CANONICAL_WRAPPER_PATTERN = re.compile(
+    r'<fin-ref\s+type=\\?"[a-z_]+\\?"\s+id=\\?"(?P<canonical>(?!FS_)[^"\\]+)\\?">'
+    r".*?</fin-ref>",
+    re.IGNORECASE | re.DOTALL,
+)
 
 
 STOCK_PROFILES: Mapping[str, Tuple[str, str, str]] = {
@@ -438,8 +443,8 @@ class ProxyConfig:
     seed: str
     timeout: float
     privacy_model_base_url: str = ""
-    privacy_model_name: str = "Qwen2.5-3B-Instruct"
-    adaptive_threshold: float = 0.60
+    privacy_model_name: str = "qwen35_4b"
+    adaptive_threshold: float = 0.40
     adaptive_calibration: str = ""
 
 
@@ -472,17 +477,17 @@ class PrivacyController:
             if config.method == "finscope" and config.privacy_model_base_url
             else None
         )
-        self.risk_estimator = self._load_risk_estimator(config.adaptive_calibration)
+        self.risk_lookup = self._load_risk_lookup(config.adaptive_calibration)
         config.audit_log.parent.mkdir(parents=True, exist_ok=True)
 
     @staticmethod
-    def _load_risk_estimator(path: str) -> RiskEstimator:
+    def _load_risk_lookup(path: str) -> EmpiricalRiskLookup:
         if not path:
-            return RiskEstimator()
+            return EmpiricalRiskLookup()
         source = Path(path)
         if not source.is_file():
             raise FileNotFoundError("adaptive calibration artifact not found: %s" % source)
-        return load_risk_estimator(source)
+        return load_empirical_risk_lookup(source)
 
     def episode_id(self, payload: Mapping[str, Any]) -> str:
         # FinScope keeps one task/session state across dates. Baselines retain
@@ -603,7 +608,7 @@ class PrivacyController:
                 self.agents[episode] = agent
                 self.scopes[episode] = scope
                 controller = AdaptiveReplacementController(
-                    self.risk_estimator,
+                    self.risk_lookup,
                     threshold=self.config.adaptive_threshold,
                     default_level=self.config.disclosure_level,
                 )
@@ -620,6 +625,9 @@ class PrivacyController:
         outbound.pop("finscope_role", None)
         outbound.pop("finscope_task", None)
         outbound["model"] = self.config.upstream_model
+        chat_template_kwargs = dict(outbound.get("chat_template_kwargs") or {})
+        chat_template_kwargs["enable_thinking"] = False
+        outbound["chat_template_kwargs"] = chat_template_kwargs
         messages = outbound.get("messages", [])
         method = self.config.method
         if method in {"vanilla", "llm_rewrite"}:
@@ -650,7 +658,7 @@ class PrivacyController:
             )
             pre_rotation = None
             if day_boundary:
-                boundary_risk = controller.estimator.predict(controller.exposure)
+                boundary_risk = controller.risk_lookup.predict(controller.exposure)
                 if boundary_risk.combined >= controller.threshold:
                     new_scope, reset = runtime.rotate_at_checkpoint(
                         scope,
@@ -752,7 +760,7 @@ class PrivacyController:
                 purpose=str(context.get("purpose", "research")),
             )
             rotation = context.get("pre_rotation")
-            if decision.decision.value != "keep":
+            if decision.decision.value == "replace_now":
                 minimal_state = {
                     "task_phase": phase,
                     "trading_day": context.get("trading_day", ""),
@@ -791,7 +799,7 @@ class PrivacyController:
                 "exposure_state": controller.exposure.as_dict(),
                 "rotation": rotation,
                 "rotation_count": controller.rotation_count,
-                "estimator_fitted": controller.estimator.fitted,
+                "risk_lookup_ready": controller.risk_lookup.ready,
             }
 
     def restore(
@@ -822,10 +830,67 @@ class PrivacyController:
                 issues,
             )
         agent, scope = state
-        result = agent.restore_and_audit(response, scope)
+        normalized = dict(response)
+        normalized_choices = []
+        json_content_indices = set()
+        choices = response.get("choices")
+        if isinstance(choices, list):
+            for index, choice in enumerate(choices):
+                normalized_choice = dict(choice) if isinstance(choice, Mapping) else choice
+                if isinstance(normalized_choice, dict):
+                    message = normalized_choice.get("message")
+                    if isinstance(message, Mapping):
+                        normalized_message = dict(message)
+                        content = normalized_message.get("content")
+                        if isinstance(content, str):
+                            try:
+                                parsed_content = json.loads(content)
+                            except json.JSONDecodeError:
+                                parsed_content = None
+                            if isinstance(parsed_content, (Mapping, list)):
+                                normalized_message["content"] = parsed_content
+                                json_content_indices.add(index)
+                        normalized_choice["message"] = normalized_message
+                normalized_choices.append(normalized_choice)
+            normalized["choices"] = normalized_choices
+
+        result = agent.restore_and_audit(normalized, scope)
         if result.status in {"safe", "needs_retry"} and isinstance(result.value, Mapping):
+            def strip_canonical_wrappers(value: Any) -> Any:
+                if isinstance(value, str):
+                    return CANONICAL_WRAPPER_PATTERN.sub(
+                        lambda match: match.group("canonical"), value
+                    )
+                if isinstance(value, Mapping):
+                    return {
+                        strip_canonical_wrappers(key)
+                        if isinstance(key, str)
+                        else key: strip_canonical_wrappers(item)
+                        for key, item in value.items()
+                    }
+                if isinstance(value, list):
+                    return [strip_canonical_wrappers(item) for item in value]
+                return value
+
+            restored = strip_canonical_wrappers(dict(result.value))
+            restored_choices = restored.get("choices")
+            if isinstance(restored_choices, list):
+                encoded_choices = []
+                for index, choice in enumerate(restored_choices):
+                    encoded_choice = dict(choice) if isinstance(choice, Mapping) else choice
+                    if index in json_content_indices and isinstance(encoded_choice, dict):
+                        message = encoded_choice.get("message")
+                        if isinstance(message, Mapping):
+                            encoded_message = dict(message)
+                            content = encoded_message.get("content")
+                            encoded_message["content"] = json.dumps(
+                                content, ensure_ascii=False
+                            )
+                            encoded_choice["message"] = encoded_message
+                    encoded_choices.append(encoded_choice)
+                restored["choices"] = encoded_choices
             return (
-                dict(result.value),
+                restored,
                 result.status,
                 True,
                 [asdict(item) for item in result.issues],
@@ -890,6 +955,7 @@ class PrivacyController:
         )
         rewrite_payload = {
             "model": self.config.upstream_model,
+            "chat_template_kwargs": {"enable_thinking": False},
             "messages": [
                 {"role": "system", "content": "You are a privacy-preserving financial text rewriter."},
                 {"role": "user", "content": prompt},
@@ -1094,17 +1160,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--upstream-url", required=True)
     parser.add_argument("--upstream-model", default="Qwen3.8-27B")
     parser.add_argument("--privacy-model-base-url", default="")
-    parser.add_argument("--privacy-model-name", default="Qwen2.5-3B-Instruct")
+    parser.add_argument("--privacy-model-name", default="qwen35_4b")
     parser.add_argument(
         "--adaptive-threshold",
         type=float,
-        default=float(os.environ.get("FINSCOPE_ADAPTIVE_T", "0.60")),
+        default=float(os.environ.get("FINSCOPE_ADAPTIVE_T", "0.40")),
         help="risk threshold T used by FinScope Adaptive",
     )
     parser.add_argument(
         "--adaptive-calibration",
         default=os.environ.get("FINSCOPE_ADAPTIVE_CALIBRATION", ""),
-        help="JSON prior-attack artifact used to fit the online risk estimator",
+        help="JSON artifact containing the empirical K4 attack-risk lookup",
     )
     parser.add_argument("--audit-log", type=Path, required=True)
     parser.add_argument("--disclosure-level", choices=("P1", "P2", "P3", "P4", "P5"), default="P1")

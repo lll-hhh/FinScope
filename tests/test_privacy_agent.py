@@ -120,6 +120,36 @@ class PrivacyAgentTests(unittest.TestCase):
         result = agent.restore_and_audit("Value remains stable", scope)
         self.assertEqual(result.status, "safe")
 
+    def test_inferred_identity_is_measured_without_blocking_restoration(self) -> None:
+        self.agent.sanitize("贵州茅台", self.scope, disclosure_level="P2")
+        result = self.agent.restore_and_audit(
+            "The protected asset may be 贵州茅台", self.scope
+        )
+        self.assertEqual(result.status, "needs_retry")
+        issue = next(item for item in result.issues if item.code == "direct_identity_output")
+        self.assertEqual(issue.severity, "warning")
+
+    def test_descriptor_drift_keeps_known_handle_recoverable(self) -> None:
+        safe = self.agent.sanitize("贵州茅台", self.scope, disclosure_level="P2")
+        drifted = re.sub(r">[^<]+</fin-ref>", ">消费股票</fin-ref>", safe)
+        result = self.agent.restore_and_audit(drifted, self.scope)
+        self.assertEqual(result.value, "贵州茅台")
+        self.assertEqual(result.status, "needs_retry")
+        issue = next(item for item in result.issues if item.code == "binding_mismatch")
+        self.assertEqual(issue.severity, "warning")
+
+    def test_unique_one_character_handle_typo_is_repaired(self) -> None:
+        safe = self.agent.sanitize("贵州茅台", self.scope, disclosure_level="P2")
+        match = re.search(r"FS_ASSET_[A-Z2-9]{8}", safe)
+        self.assertIsNotNone(match)
+        alias = match.group(0)
+        typo = alias[:-1] + ("A" if alias[-1] != "A" else "B")
+        drifted = safe.replace(alias, typo)
+        result = self.agent.restore_and_audit(drifted, self.scope)
+        self.assertEqual(result.value, "贵州茅台")
+        self.assertEqual(result.status, "needs_retry")
+        self.assertIn("handle_typo_repaired", {issue.code for issue in result.issues})
+
     def test_descriptor_in_reason_does_not_block_handle_bound_action(self) -> None:
         safe_asset = self.agent.sanitize(
             "贵州茅台", self.scope, disclosure_level="P2"

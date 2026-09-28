@@ -1,5 +1,10 @@
 # FinScope 项目背景、B1 方案与实验蓝图
 
+> 状态说明（2026-09-28）：本文保留项目早期背景和设计演进。当前正式执行口径以
+> [`experiment_mainline.md`](experiment_mainline.md) 和
+> [`migration_handoff_20260928.md`](migration_handoff_20260928.md) 为准：本地隐私
+> Agent 已固定为 Qwen3.5-4B，在线风险使用无训练经验查表，开发集已选择 `T=0.40`。
+
 本文是 FinScope B1 方向的完整交接材料，记录项目背景、会议结论、问题定义、当前代码状态、模型分工、数据集接入方式、攻击评测和后续实现边界。文档状态：2026-08-21。它是研究和工程交接文档，不是投资建议。
 
 ## 1. 项目摘要
@@ -118,7 +123,7 @@ FinScope 是部署在金融 Agent 与外部大模型之间的本地隐私 Agent�
 - `examples/finscope_local_model_demo.py`：本地 Transformers 识别器演示；
 - `tests/`：基础替换、作用域轮换、指代、同词异义、恢复和门控测试。
 
-已验证：`python3 -m unittest discover -s tests -v` 通过 33 项测试。P1-P5、同类资产唯一恢复、旧句柄拒绝、模型幻觉回退、恢复审计、模型配置和统一 benchmark adapter 都有离线回归测试。当前还没有完成三套上游 benchmark 的正式回测，不能把原型测试结果写成金融收益或隐私攻击结论。
+已验证：`python3 -m unittest discover -s tests -v` 通过 89 项测试。P1-P5、同类资产唯一恢复、旧句柄拒绝、模型幻觉回退、经验风险查表、自适应替换、恢复审计、模型配置和统一 benchmark adapter 都有离线回归测试。三套上游 benchmark 的正式主表尚未完成，不能把单元测试或开发集阈值结果写成最终金融收益结论。
 
 ## 5. 模型分工与 Qwen 27B 说明
 
@@ -251,7 +256,7 @@ FAL（Financial Association Leakage）可以作为报告总称，但在定义权
 
 - 尚未完成 TradingAgents/FinRobot/AI Hedge Fund 的正式 adapter；
 - 尚未在完整 NLPCC LFS 数据上跑出金融收益结果；
-- 尚未完成候选池扩大后的攻击 ground truth 和统一 FAL 标定；
+- StockBench 的 20 证券闭集 K1-K4 攻击和 T 扫描已完成；扩大候选池后的攻击 ground truth、其他 Benchmark 攻击和统一 FAL 标定尚未完成；
 - 当前映射主要在内存中，生产部署仍需本地加密存储、密钥生命周期和崩溃恢复设计；
 - 10 个本地隐私模型都需要真实中文金融残余 span 数据做准确率、漏检和误报评估；当前只有 Qwen3.5-2B 有单日 pipeline smoke，不能替代正式开发集比较；
 - 企业网关中的 DeepSeek/GLM 实际模型 alias 尚需在实验服务器核验；
@@ -260,7 +265,7 @@ FAL（Financial Association Leakage）可以作为报告总称，但在定义权
 ## 12. 交接后的最小执行顺序
 
 1. 审计新服务器 GPU、CUDA、Python、磁盘、Git LFS 和模型缓存；
-2. 克隆本仓库，运行现有 33 项测试；
+2. 克隆本仓库，运行现有 89 项测试；
 3. 核验用户给出的 Qwen 27B 实际模型 ID，明确基座模型与 10 个 ≤4B 本地隐私模型的部署分工；
 4. 拉取 NLPCC LFS 数据，核验真实文件、日期、新闻覆盖、候选池和许可；
 5. 先用一个交易日、一个 Agent、少量候选资产完成 Vanilla -> sanitize -> 外部 LLM -> restore -> validate -> backtest smoke；

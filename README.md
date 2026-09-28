@@ -69,7 +69,7 @@ FinScope 解决一个很具体的问题：金融 Agent 需要把新闻、行情�
 - 交易动作恢复与资产、方向、数量、价格、权重合法性校验；
 - NLPCC、StockBench、FinVault 共用的 Agent 生命周期适配接口；
 - 本地 Qwen3.8-27B、企业 DeepSeek V4 Flash、GLM-5.1 的 OpenAI-compatible 配置；
-- 49 项离线测试，不需要模型服务器和 API 即可运行。
+- 离线回归测试覆盖经验风险查表、自适应替换、JSON 恢复和故障安全，不需要模型服务器和 API 即可运行。
 
 仓库中保留的 `NLPCC 2026 Track 1 public A-set × Qwen3.8-27B` 全年结果来自旧版 deterministic local-agent，只能作为工程参考，不能作为当前论文结果。严格协议要求 Qwen3.8-27B 只做任务模型、≤4B 小模型做本地隐私 Agent；这套正式全年重跑和三基座/三 benchmark 矩阵仍在实验服务器执行。逐日匿名输出、本地恢复 action 和映射 ground truth 不提交，只保留在实验服务器。
 
@@ -138,8 +138,8 @@ COLING B1 当前执行版的八项补充实验（动态披露、长程替换与�
 | 名称 | 部署 | 配置用途 |
 | --- | --- | --- |
 | Qwen3.8-27B | 本地 vLLM/SGLang/OpenAI-compatible 服务 | 金融任务基座；不作为最终本地隐私 Agent |
-| Qwen2.5-3B-Instruct | 本地 Transformers/OpenAI-compatible 服务 | 当前正式本地隐私 Agent，固定承担识别、P-level 规划和恢复审计；配置见 `benchmarks/local_privacy_qwen3b.json` |
-| 10 个 ≤4B instruction-tuned 小模型 | 本地 Transformers/OpenAI-compatible 服务 | 可选的历史模型选择支撑，不得替换正式 Qwen2.5-3B-Instruct |
+| Qwen3.5-4B | 本地 vLLM/OpenAI-compatible 服务 | 当前正式本地隐私 Agent及无需训练的隐私攻击器；配置见 `benchmarks/local_privacy_qwen35_4b.json` |
+| 10 个 ≤4B instruction-tuned 小模型 | 本地 Transformers/OpenAI-compatible 服务 | 开发集模型选择与历史支撑；正式主表固定使用 Qwen3.5-4B |
 | DeepSeek V4 Flash | 企业 OpenAI-compatible 网关 | 外部基座对照 |
 | GLM-5.1 | 企业 OpenAI-compatible 网关 | 外部基座对照 |
 
@@ -376,6 +376,8 @@ docs/                     背景、快速入门和服务器交接提示词
 - [COLING 故事、实验清单与表格](docs/coling_story_experiment_tables.md)
 - [StockBench/FinVault 接入与 Qwen 全量调度](docs/external_benchmark_integration.md)
 - [服务器交接启动提示词](docs/agent_handoff_prompt.md)
+- [2026-09-28 迁移状态与接续任务](docs/migration_handoff_20260928.md)
+- [真实阈值校准产物](artifacts/threshold_calibration_20260920/README.md)
 
 ## 12. 安全与复现底线
 

@@ -1,4 +1,4 @@
-"""Build the online risk-estimator artifact from LLM attack results."""
+"""Build the empirical online risk lookup from zero-shot LLM attacks."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ def main() -> None:
     parser.add_argument(
         "--prior-level",
         default="K4",
-        help="public-prior level used for conservative online risk fitting (default: K4)",
+        help="public-prior level used for the conservative lookup (default: K4)",
     )
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
@@ -37,22 +37,28 @@ def main() -> None:
             continue
         row: Dict[str, Any] = dict(source_row)
         # A one-step trace has no cross-step pairs.  It represents the random
-        # linkage baseline for fitting, while the reported table keeps Link
+        # linkage baseline for lookup, while the reported table keeps Link
         # AUC undefined for that individual experiment cell.
         if row.get("link_auc") is None:
             row["link_auc"] = 0.5
-            row["link_auc_imputed_for_estimator"] = True
+            row["link_auc_imputed_for_lookup"] = True
         rows.append(row)
     if not rows:
         raise ValueError("no successful attack rows with exposure_state were found")
 
     result = {
-        "schema_version": 1,
-        "protocol": "Qwen3.5-4B strongest-public-prior attack outcomes mapped from local exposure state",
+        "schema_version": 2,
+        "type": "empirical_lookup",
+        "protocol": "Qwen3.5-4B zero-shot K4 attack outcomes indexed by local exposure state; no trained risk model",
         "method_filter": args.method,
         "prior_level_filter": args.prior_level,
         "source": str(args.attack),
         "created_at": datetime.now(timezone.utc).isoformat(),
+        "lookup_rule": {
+            "exposure_index": "equal mean of the seven capped local exposure features",
+            "interpolation": "piecewise linear",
+            "monotonicity": "cumulative upper envelope of measured ReID and linkage risk",
+        },
         "rows": rows,
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)

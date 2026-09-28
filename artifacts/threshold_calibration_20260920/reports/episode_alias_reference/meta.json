@@ -1,0 +1,6 @@
+{
+  "python": "3.11.15 | packaged by conda-forge | (main, Jun 11 2026, 03:34:02) [GCC 14.3.0]",
+  "pandas": "3.0.5",
+  "pyarrow": "18.1.0",
+  "httpx": "0.28.1"
+}
